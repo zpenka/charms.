@@ -29,4 +29,4 @@ On launch, choose your mode:
 | `Esc` | Cancel selection |
 | `q` | Quit |
 
-Valid move destinations are highlighted on the board. Move history is shown in algebraic notation below the board. The computer opponent uses a depth-4 minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Pawns auto-promote to queens.
+Valid move destinations are highlighted on the board. After every move, the from- and to-squares of the last move are tinted in amber so you can always see what just happened. Move history is shown in algebraic notation below the board. The computer opponent uses a depth-4 minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Pawns auto-promote to queens.
