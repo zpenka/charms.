@@ -331,6 +331,18 @@ func (m model) View() string {
 
 	sb.WriteString("    a  b  c  d  e  f  g  h\n\n")
 	sb.WriteString(" " + msgStyle.Render(m.message) + "\n\n")
+
+	if lines := formatMoveHistory(m.game); len(lines) > 0 {
+		start := 0
+		if len(lines) > 8 {
+			start = len(lines) - 8
+		}
+		for _, l := range lines[start:] {
+			sb.WriteString(" " + msgStyle.Render(l) + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString(" ↑↓←→ / hjkl  move cursor\n")
 	sb.WriteString(" Enter / Space  select / move\n")
 	sb.WriteString(" Esc  cancel selection   q  quit\n\n")
