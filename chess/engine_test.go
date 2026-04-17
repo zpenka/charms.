@@ -20,8 +20,8 @@ func TestEvaluate_ExtraWhitePawn(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := chess.NewGame(fen)
-	if got := evaluate(g.Position()); got != 100 {
-		t.Errorf("extra white pawn score = %d, want 100", got)
+	if got := evaluate(g.Position()); got <= 0 {
+		t.Errorf("extra white pawn score = %d, want > 0", got)
 	}
 }
 
@@ -31,8 +31,8 @@ func TestEvaluate_ExtraBlackRook(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := chess.NewGame(fen)
-	if got := evaluate(g.Position()); got != -500 {
-		t.Errorf("extra black rook score = %d, want -500", got)
+	if got := evaluate(g.Position()); got >= 0 {
+		t.Errorf("extra black rook score = %d, want < 0", got)
 	}
 }
 
@@ -42,8 +42,8 @@ func TestEvaluate_WhiteAheadByKnight(t *testing.T) {
 		t.Fatal(err)
 	}
 	g := chess.NewGame(fen)
-	if got := evaluate(g.Position()); got != 320 {
-		t.Errorf("white extra knight score = %d, want 320", got)
+	if got := evaluate(g.Position()); got <= 0 {
+		t.Errorf("white extra knight score = %d, want > 0", got)
 	}
 }
 
@@ -105,5 +105,80 @@ func TestBestMove_ReturnsAMoveForNormalPosition(t *testing.T) {
 	g := chess.NewGame()
 	if mv := bestMove(g); mv == nil {
 		t.Error("bestMove should return a move from the starting position")
+	}
+}
+
+// searchDepth
+
+func TestSearchDepth_IsFour(t *testing.T) {
+	if searchDepth != 4 {
+		t.Errorf("searchDepth = %d, want 4", searchDepth)
+	}
+}
+
+// positional evaluation (piece-square tables)
+
+func TestEvaluate_CentralKnightScoresHigherThanCornerKnight(t *testing.T) {
+	fenCenter, err := chess.FEN("4k3/8/8/8/4N3/8/8/4K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fenCorner, err := chess.FEN("4k3/8/8/8/8/8/8/N3K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scoreCenter := evaluate(chess.NewGame(fenCenter).Position())
+	scoreCorner := evaluate(chess.NewGame(fenCorner).Position())
+	if scoreCenter <= scoreCorner {
+		t.Errorf("central knight (%d) should score higher than corner knight (%d)", scoreCenter, scoreCorner)
+	}
+}
+
+func TestEvaluate_CentralPawnScoresHigherThanEdgePawn(t *testing.T) {
+	fenCenter, err := chess.FEN("4k3/8/8/8/4P3/8/8/4K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fenEdge, err := chess.FEN("4k3/8/8/8/P7/8/8/4K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scoreCenter := evaluate(chess.NewGame(fenCenter).Position())
+	scoreEdge := evaluate(chess.NewGame(fenEdge).Position())
+	if scoreCenter <= scoreEdge {
+		t.Errorf("central pawn (%d) should score higher than edge pawn (%d)", scoreCenter, scoreEdge)
+	}
+}
+
+func TestEvaluate_AdvancedPawnScoresHigherThanStartingPawn(t *testing.T) {
+	fenAdvanced, err := chess.FEN("4k3/8/8/4P3/8/8/8/4K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fenStart, err := chess.FEN("4k3/8/8/8/8/8/4P3/4K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scoreAdvanced := evaluate(chess.NewGame(fenAdvanced).Position())
+	scoreStart := evaluate(chess.NewGame(fenStart).Position())
+	if scoreAdvanced <= scoreStart {
+		t.Errorf("advanced pawn (%d) should score higher than starting pawn (%d)", scoreAdvanced, scoreStart)
+	}
+}
+
+func TestEvaluate_PositionalBonusIsSymmetric(t *testing.T) {
+	// White knight on E4 and black knight on E5 should produce equal and opposite scores.
+	fenWhite, err := chess.FEN("4k3/8/8/8/4N3/8/8/4K3 w - - 0 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fenBlack, err := chess.FEN("4k3/8/8/4n3/8/8/8/4K3 w - - 0 1") // E5 mirrors E4
+	if err != nil {
+		t.Fatal(err)
+	}
+	scoreWhite := evaluate(chess.NewGame(fenWhite).Position())
+	scoreBlack := evaluate(chess.NewGame(fenBlack).Position())
+	if scoreWhite != -scoreBlack {
+		t.Errorf("positional bonus not symmetric: white knight = %d, black knight = %d (want negatives of each other)", scoreWhite, scoreBlack)
 	}
 }
