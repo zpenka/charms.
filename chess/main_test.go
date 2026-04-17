@@ -664,7 +664,7 @@ func TestModeSelect_PressOneStartsTwoPlayer(t *testing.T) {
 	}
 }
 
-func TestModeSelect_PressTwoGoesToColorSelect(t *testing.T) {
+func TestModeSelect_PressTwoGoesToDiffSelect(t *testing.T) {
 	m := newModel()
 	m.modeSelect = true
 
@@ -674,11 +674,14 @@ func TestModeSelect_PressTwoGoesToColorSelect(t *testing.T) {
 	if got.modeSelect {
 		t.Error("modeSelect should be false after pressing 2")
 	}
-	if !got.colorSelect {
-		t.Error("colorSelect should be true after pressing 2")
+	if !got.diffSelect {
+		t.Error("diffSelect should be true after pressing 2")
+	}
+	if got.colorSelect {
+		t.Error("colorSelect should not be true yet — must choose difficulty first")
 	}
 	if got.vsComputer {
-		t.Error("vsComputer should not be set yet during color selection")
+		t.Error("vsComputer should not be set yet during difficulty selection")
 	}
 }
 

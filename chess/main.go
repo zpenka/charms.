@@ -40,12 +40,14 @@ type model struct {
 	validDests    map[chess.Square]bool
 	message       string
 	modeSelect    bool
+	diffSelect    bool
 	colorSelect   bool
 	vsComputer    bool
 	computerColor chess.Color
 	thinking      bool
 	lastFrom      *chess.Square
 	lastTo        *chess.Square
+	difficulty    int
 }
 
 func newModel() model {
@@ -57,10 +59,10 @@ func newModel() model {
 	}
 }
 
-func computeMove(g *chess.Game) tea.Cmd {
+func computeMove(g *chess.Game, depth int) tea.Cmd {
 	snapshot := g.Clone()
 	return func() tea.Msg {
-		return computerMoveMsg{bestMove(snapshot)}
+		return computerMoveMsg{bestMoveAtDepth(snapshot, depth)}
 	}
 }
 
@@ -94,7 +96,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.message = "White's turn"
 			case "2":
 				m.modeSelect = false
+				m.diffSelect = true
+			}
+			return m, nil
+		}
+
+		if m.diffSelect {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "1":
+				m.diffSelect = false
 				m.colorSelect = true
+				m.difficulty = 1
+			case "2":
+				m.diffSelect = false
+				m.colorSelect = true
+				m.difficulty = 2
+			case "3":
+				m.diffSelect = false
+				m.colorSelect = true
+				m.difficulty = 3
 			}
 			return m, nil
 		}
@@ -114,7 +136,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.computerColor = chess.White
 				m.thinking = true
 				m.message = "Computer is thinking..."
-				return m, computeMove(m.game)
+				return m, computeMove(m.game, depthForDifficulty(m.difficulty))
 			}
 			return m, nil
 		}
@@ -198,7 +220,7 @@ func (m model) handleSelect() (tea.Model, tea.Cmd) {
 	if m.vsComputer && m.game.Position().Turn() == m.computerColor && m.game.Outcome() == chess.NoOutcome {
 		m.thinking = true
 		m.message = "Computer is thinking..."
-		return m, computeMove(m.game)
+		return m, computeMove(m.game, depthForDifficulty(m.difficulty))
 	}
 	return m, nil
 }
@@ -265,6 +287,19 @@ func (m model) View() string {
 		sb.WriteString("  [1]  Two player\n")
 		sb.WriteString("  [2]  vs Computer\n\n")
 		sb.WriteString("  " + msgStyle.Render("Press 1 or 2") + "\n\n")
+		return sb.String()
+	}
+
+	if m.diffSelect {
+		var sb strings.Builder
+		sb.WriteString("\n ")
+		sb.WriteString(titleStyle.Render("Chess"))
+		sb.WriteString("\n\n")
+		sb.WriteString("  Select difficulty\n\n")
+		sb.WriteString("  [1]  Easy\n")
+		sb.WriteString("  [2]  Medium\n")
+		sb.WriteString("  [3]  Hard\n\n")
+		sb.WriteString("  " + msgStyle.Render("Press 1, 2, or 3") + "\n\n")
 		return sb.String()
 	}
 
