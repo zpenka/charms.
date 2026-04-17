@@ -48,6 +48,9 @@ type model struct {
 	lastFrom      *chess.Square
 	lastTo        *chess.Square
 	difficulty    int
+	promoting     bool
+	promotionFrom chess.Square
+	promotionTo   chess.Square
 }
 
 func newModel() model {
@@ -72,6 +75,15 @@ func toSquare(row, col int) chess.Square {
 
 func isLight(row, col int) bool {
 	return ((7-row)+col)%2 == 1
+}
+
+func isPromotionMove(g *chess.Game, from, to chess.Square) bool {
+	for _, mv := range g.ValidMoves() {
+		if mv.S1() == from && mv.S2() == to && mv.Promo() != chess.NoPieceType {
+			return true
+		}
+	}
+	return false
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -137,6 +149,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.thinking = true
 				m.message = "Computer is thinking..."
 				return m, computeMove(m.game, depthForDifficulty(m.difficulty))
+			}
+			return m, nil
+		}
+
+		if m.promoting {
+			switch msg.String() {
+			case "q", "Q":
+				m.promoting = false
+				m.executePromotion(chess.Queen)
+			case "r", "R":
+				m.promoting = false
+				m.executePromotion(chess.Rook)
+			case "b", "B":
+				m.promoting = false
+				m.executePromotion(chess.Bishop)
+			case "n", "N":
+				m.promoting = false
+				m.executePromotion(chess.Knight)
+			case "ctrl+c":
+				return m, tea.Quit
+			}
+			if !m.promoting && m.vsComputer && m.game.Position().Turn() == m.computerColor && m.game.Outcome() == chess.NoOutcome {
+				m.thinking = true
+				m.message = "Computer is thinking..."
+				return m, computeMove(m.game)
 			}
 			return m, nil
 		}
@@ -213,6 +250,17 @@ func (m model) handleSelect() (tea.Model, tea.Cmd) {
 	}
 
 	fromSq := toSquare((*m.selected)[0], (*m.selected)[1])
+
+	if isPromotionMove(m.game, fromSq, sq) {
+		m.promoting = true
+		m.promotionFrom = fromSq
+		m.promotionTo = sq
+		m.selected = nil
+		m.validDests = make(map[chess.Square]bool)
+		m.message = "Promote pawn: Q R B N"
+		return m, nil
+	}
+
 	m.executeMove(fromSq, sq)
 	m.selected = nil
 	m.validDests = make(map[chess.Square]bool)
@@ -266,6 +314,29 @@ func (m *model) executeMove(from, to chess.Square) {
 			m.message = "Check!  " + turnMsg(m.game)
 		} else {
 			m.message = turnMsg(m.game)
+		}
+	}
+}
+
+func (m *model) executePromotion(piece chess.PieceType) {
+	for _, mv := range m.game.ValidMoves() {
+		if mv.S1() == m.promotionFrom && mv.S2() == m.promotionTo && mv.Promo() == piece {
+			m.game.Move(mv)
+			switch m.game.Outcome() {
+			case chess.WhiteWon:
+				m.message = "Checkmate! White wins!  (q to quit)"
+			case chess.BlackWon:
+				m.message = "Checkmate! Black wins!  (q to quit)"
+			case chess.Draw:
+				m.message = "Draw!  (q to quit)"
+			default:
+				if mv.HasTag(chess.Check) {
+					m.message = "Check!  " + turnMsg(m.game)
+				} else {
+					m.message = turnMsg(m.game)
+				}
+			}
+			return
 		}
 	}
 }
@@ -380,6 +451,10 @@ func (m model) View() string {
 
 	sb.WriteString("    a  b  c  d  e  f  g  h\n\n")
 	sb.WriteString(" " + msgStyle.Render(m.message) + "\n\n")
+
+	if m.promoting {
+		sb.WriteString("  [Q]ueen  [R]ook  [B]ishop  [N]knight\n\n")
+	}
 
 	if lines := formatMoveHistory(m.game); len(lines) > 0 {
 		start := 0
