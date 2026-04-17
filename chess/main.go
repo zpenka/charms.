@@ -29,12 +29,18 @@ var glyphs = map[chess.PieceType][2]string{
 	chess.Pawn:   {"♙", "♟"},
 }
 
+type computerMoveMsg struct{ move *chess.Move }
+
 type model struct {
-	game       *chess.Game
-	cursor     [2]int
-	selected   *[2]int
-	validDests map[chess.Square]bool
-	message    string
+	game          *chess.Game
+	cursor        [2]int
+	selected      *[2]int
+	validDests    map[chess.Square]bool
+	message       string
+	modeSelect    bool
+	vsComputer    bool
+	computerColor chess.Color
+	thinking      bool
 }
 
 func newModel() model {
@@ -43,6 +49,13 @@ func newModel() model {
 		cursor:     [2]int{7, 4},
 		validDests: make(map[chess.Square]bool),
 		message:    "White's turn",
+	}
+}
+
+func computeMove(g *chess.Game) tea.Cmd {
+	snapshot := g.Clone()
+	return func() tea.Msg {
+		return computerMoveMsg{bestMove(snapshot)}
 	}
 }
 
@@ -57,8 +70,36 @@ func isLight(row, col int) bool {
 func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if cmsg, ok := msg.(computerMoveMsg); ok {
+		if cmsg.move != nil {
+			m.executeMove(cmsg.move.S1(), cmsg.move.S2())
+		}
+		m.thinking = false
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.modeSelect {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "1":
+				m.modeSelect = false
+				m.message = "White's turn"
+			case "2":
+				m.modeSelect = false
+				m.vsComputer = true
+				m.computerColor = chess.Black
+				m.message = "White's turn"
+			}
+			return m, nil
+		}
+
+		if m.thinking {
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -130,6 +171,12 @@ func (m model) handleSelect() (tea.Model, tea.Cmd) {
 	m.executeMove(fromSq, sq)
 	m.selected = nil
 	m.validDests = make(map[chess.Square]bool)
+
+	if m.vsComputer && m.game.Position().Turn() == m.computerColor && m.game.Outcome() == chess.NoOutcome {
+		m.thinking = true
+		m.message = "Computer is thinking..."
+		return m, computeMove(m.game)
+	}
 	return m, nil
 }
 
@@ -181,6 +228,18 @@ func turnMsg(g *chess.Game) string {
 }
 
 func (m model) View() string {
+	if m.modeSelect {
+		var sb strings.Builder
+		sb.WriteString("\n ")
+		sb.WriteString(titleStyle.Render("Chess"))
+		sb.WriteString("\n\n")
+		sb.WriteString("  How do you want to play?\n\n")
+		sb.WriteString("  [1]  Two player\n")
+		sb.WriteString("  [2]  vs Computer  (you play White)\n\n")
+		sb.WriteString("  " + msgStyle.Render("Press 1 or 2") + "\n\n")
+		return sb.String()
+	}
+
 	var sb strings.Builder
 
 	sb.WriteString("\n ")
@@ -250,7 +309,10 @@ func (m model) View() string {
 }
 
 func main() {
-	p := tea.NewProgram(newModel(), tea.WithAltScreen())
+	m := newModel()
+	m.modeSelect = true
+	m.message = ""
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("error: %v\n", err)
 	}

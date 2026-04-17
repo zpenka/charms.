@@ -643,3 +643,186 @@ func TestView_UpdatedMessageAfterMove(t *testing.T) {
 		t.Error("view should show black's turn after white's move")
 	}
 }
+
+// Mode selection
+
+func TestModeSelect_PressOneStartsTwoPlayer(t *testing.T) {
+	m := newModel()
+	m.modeSelect = true
+
+	updated, _ := m.Update(key("1"))
+	got := updated.(model)
+
+	if got.modeSelect {
+		t.Error("modeSelect should be false after pressing 1")
+	}
+	if got.vsComputer {
+		t.Error("vsComputer should be false in two-player mode")
+	}
+	if got.message != "White's turn" {
+		t.Errorf("message = %q, want \"White's turn\"", got.message)
+	}
+}
+
+func TestModeSelect_PressTwoStartsVsComputer(t *testing.T) {
+	m := newModel()
+	m.modeSelect = true
+
+	updated, _ := m.Update(key("2"))
+	got := updated.(model)
+
+	if got.modeSelect {
+		t.Error("modeSelect should be false after pressing 2")
+	}
+	if !got.vsComputer {
+		t.Error("vsComputer should be true")
+	}
+	if got.computerColor != chess.Black {
+		t.Errorf("computerColor = %v, want Black", got.computerColor)
+	}
+	if got.message != "White's turn" {
+		t.Errorf("message = %q, want \"White's turn\"", got.message)
+	}
+}
+
+func TestModeSelect_OtherKeyIgnored(t *testing.T) {
+	m := newModel()
+	m.modeSelect = true
+
+	updated, cmd := m.Update(key("x"))
+	got := updated.(model)
+
+	if !got.modeSelect {
+		t.Error("modeSelect should remain true for unrecognised key")
+	}
+	if cmd != nil {
+		t.Error("unrecognised key should not return a command")
+	}
+}
+
+func TestModeSelect_QuitWorks(t *testing.T) {
+	for _, k := range []string{"q", "ctrl+c"} {
+		t.Run(k, func(t *testing.T) {
+			m := newModel()
+			m.modeSelect = true
+			_, cmd := m.Update(key(k))
+			if cmd == nil {
+				t.Fatalf("key %q should return quit command in mode select", k)
+			}
+			if _, ok := cmd().(tea.QuitMsg); !ok {
+				t.Errorf("key %q: expected QuitMsg", k)
+			}
+		})
+	}
+}
+
+func TestView_ModeSelectShowsOptions(t *testing.T) {
+	m := newModel()
+	m.modeSelect = true
+	view := m.View()
+
+	if !strings.Contains(view, "Two player") {
+		t.Error("mode select view should show 'Two player'")
+	}
+	if !strings.Contains(view, "Computer") {
+		t.Error("mode select view should show 'Computer'")
+	}
+	if strings.Contains(view, "a  b  c") {
+		t.Error("mode select view should not render the board")
+	}
+}
+
+// Thinking state
+
+func TestThinking_BlocksKeyboardInput(t *testing.T) {
+	m := newModel()
+	m.thinking = true
+	m.cursor = [2]int{4, 4}
+
+	updated, _ := m.Update(key("up"))
+	if updated.(model).cursor != [2]int{4, 4} {
+		t.Error("cursor should not move while computer is thinking")
+	}
+}
+
+func TestComputerMoveMsg_AppliesMoveAndClearsThinking(t *testing.T) {
+	m := newModel()
+	m.thinking = true
+
+	var mv *chess.Move
+	for _, v := range m.game.ValidMoves() {
+		if v.S1() == chess.E2 && v.S2() == chess.E4 {
+			mv = v
+			break
+		}
+	}
+	if mv == nil {
+		t.Fatal("could not find e2-e4 in valid moves")
+	}
+
+	updated, _ := m.Update(computerMoveMsg{mv})
+	got := updated.(model)
+
+	if got.thinking {
+		t.Error("thinking should be false after computerMoveMsg")
+	}
+	if got.game.Position().Board().Piece(chess.E4) == chess.NoPiece {
+		t.Error("expected pawn on e4 after computer move")
+	}
+}
+
+func TestComputerMoveMsg_NilMoveJustClearsThinking(t *testing.T) {
+	m := newModel()
+	m.thinking = true
+	before := m.game.Position().Hash()
+
+	updated, _ := m.Update(computerMoveMsg{nil})
+	got := updated.(model)
+
+	if got.thinking {
+		t.Error("thinking should be false after nil computerMoveMsg")
+	}
+	if got.game.Position().Hash() != before {
+		t.Error("game state should not change for nil move")
+	}
+}
+
+// vs Computer command wiring
+
+func TestHandleSelect_TriggersComputerMoveInVsComputerMode(t *testing.T) {
+	m := newModel()
+	m.vsComputer = true
+	m.computerColor = chess.Black
+
+	m.cursor = [2]int{6, 4}
+	updated, _ := m.handleSelect()
+	m = updated.(model)
+	m.cursor = [2]int{4, 4}
+	updated, cmd := m.handleSelect()
+	got := updated.(model)
+
+	if !got.thinking {
+		t.Error("expected thinking=true after player move vs computer")
+	}
+	if cmd == nil {
+		t.Error("expected a command to compute the computer's response")
+	}
+}
+
+func TestHandleSelect_NoComputerCmdInTwoPlayerMode(t *testing.T) {
+	m := newModel()
+
+	m.cursor = [2]int{6, 4}
+	updated, _ := m.handleSelect()
+	m = updated.(model)
+	m.cursor = [2]int{4, 4}
+	updated, cmd := m.handleSelect()
+	got := updated.(model)
+
+	if got.thinking {
+		t.Error("thinking should be false in two-player mode")
+	}
+	if cmd != nil {
+		t.Error("no command should be returned in two-player mode")
+	}
+}
