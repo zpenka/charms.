@@ -664,7 +664,7 @@ func TestModeSelect_PressOneStartsTwoPlayer(t *testing.T) {
 	}
 }
 
-func TestModeSelect_PressTwoStartsVsComputer(t *testing.T) {
+func TestModeSelect_PressTwoGoesToColorSelect(t *testing.T) {
 	m := newModel()
 	m.modeSelect = true
 
@@ -674,6 +674,26 @@ func TestModeSelect_PressTwoStartsVsComputer(t *testing.T) {
 	if got.modeSelect {
 		t.Error("modeSelect should be false after pressing 2")
 	}
+	if !got.colorSelect {
+		t.Error("colorSelect should be true after pressing 2")
+	}
+	if got.vsComputer {
+		t.Error("vsComputer should not be set yet during color selection")
+	}
+}
+
+// Color selection
+
+func TestColorSelect_WChoosesWhite(t *testing.T) {
+	m := newModel()
+	m.colorSelect = true
+
+	updated, cmd := m.Update(key("w"))
+	got := updated.(model)
+
+	if got.colorSelect {
+		t.Error("colorSelect should be false after choosing White")
+	}
 	if !got.vsComputer {
 		t.Error("vsComputer should be true")
 	}
@@ -682,6 +702,80 @@ func TestModeSelect_PressTwoStartsVsComputer(t *testing.T) {
 	}
 	if got.message != "White's turn" {
 		t.Errorf("message = %q, want \"White's turn\"", got.message)
+	}
+	if cmd != nil {
+		t.Error("no command should fire when player goes first")
+	}
+}
+
+func TestColorSelect_BChoosesBlack(t *testing.T) {
+	m := newModel()
+	m.colorSelect = true
+
+	updated, cmd := m.Update(key("b"))
+	got := updated.(model)
+
+	if got.colorSelect {
+		t.Error("colorSelect should be false after choosing Black")
+	}
+	if !got.vsComputer {
+		t.Error("vsComputer should be true")
+	}
+	if got.computerColor != chess.White {
+		t.Errorf("computerColor = %v, want White", got.computerColor)
+	}
+	if !got.thinking {
+		t.Error("thinking should be true — computer moves first")
+	}
+	if cmd == nil {
+		t.Error("expected a command to compute the computer's first move")
+	}
+}
+
+func TestColorSelect_QuitWorks(t *testing.T) {
+	for _, k := range []string{"q", "ctrl+c"} {
+		t.Run(k, func(t *testing.T) {
+			m := newModel()
+			m.colorSelect = true
+			_, cmd := m.Update(key(k))
+			if cmd == nil {
+				t.Fatalf("key %q should return quit command in color select", k)
+			}
+			if _, ok := cmd().(tea.QuitMsg); !ok {
+				t.Errorf("key %q: expected QuitMsg", k)
+			}
+		})
+	}
+}
+
+func TestColorSelect_OtherKeyIgnored(t *testing.T) {
+	m := newModel()
+	m.colorSelect = true
+
+	updated, cmd := m.Update(key("x"))
+	got := updated.(model)
+
+	if !got.colorSelect {
+		t.Error("colorSelect should remain true for unrecognised key")
+	}
+	if cmd != nil {
+		t.Error("unrecognised key should not return a command")
+	}
+}
+
+func TestView_ColorSelectShowsOptions(t *testing.T) {
+	m := newModel()
+	m.colorSelect = true
+	view := m.View()
+
+	if !strings.Contains(view, "W") {
+		t.Error("color select view should show White option")
+	}
+	if !strings.Contains(view, "B") {
+		t.Error("color select view should show Black option")
+	}
+	if strings.Contains(view, "a  b  c") {
+		t.Error("color select view should not render the board")
 	}
 }
 
