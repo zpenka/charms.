@@ -29,4 +29,4 @@ On launch, choose your mode:
 | `Esc` | Cancel selection |
 | `q` | Quit |
 
-Valid move destinations are highlighted on the board. The computer opponent uses a minimax engine with alpha-beta pruning and auto-promotes pawns to queens.
+Valid move destinations are highlighted on the board. The computer opponent uses a depth-4 minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Pawns auto-promote to queens.
