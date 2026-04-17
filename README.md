@@ -18,7 +18,15 @@ go run .
 On launch, choose your mode:
 
 - `1` — Two player (pass and play)
-- `2` — vs Computer, then choose your colour (`W` or `B`)
+- `2` — vs Computer
+
+When playing vs Computer, you will first choose a difficulty level:
+
+- `1` — Easy (search depth 2 — faster, weaker)
+- `2` — Medium (search depth 3 — balanced)
+- `3` — Hard (search depth 4 — strongest)
+
+Then choose your colour (`W` for White or `B` for Black).
 
 **Controls:**
 
@@ -29,4 +37,4 @@ On launch, choose your mode:
 | `Esc` | Cancel selection |
 | `q` | Quit |
 
-Valid move destinations are highlighted on the board. After every move, the from- and to-squares of the last move are tinted in amber so you can always see what just happened. Move history is shown in algebraic notation below the board. The computer opponent uses a depth-4 minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Pawns auto-promote to queens.
+Valid move destinations are highlighted on the board. After every move, the from- and to-squares of the last move are tinted in amber. Move history is shown in algebraic notation below the board. The computer opponent uses a minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Search depth is determined by the selected difficulty level (2–4 ply). Pawns auto-promote to queens.
