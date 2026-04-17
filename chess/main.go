@@ -10,14 +10,16 @@ import (
 )
 
 var (
-	lightSq    = lipgloss.NewStyle().Background(lipgloss.Color("#F0D9B5")).Foreground(lipgloss.Color("#1a1a1a"))
-	darkSq     = lipgloss.NewStyle().Background(lipgloss.Color("#B58863")).Foreground(lipgloss.Color("#1a1a1a"))
-	cursorSq   = lipgloss.NewStyle().Background(lipgloss.Color("#5BA3FF")).Foreground(lipgloss.Color("#ffffff"))
-	selectedSq = lipgloss.NewStyle().Background(lipgloss.Color("#7FBF3F")).Foreground(lipgloss.Color("#ffffff"))
-	validLight = lipgloss.NewStyle().Background(lipgloss.Color("#D8C87A")).Foreground(lipgloss.Color("#555555"))
-	validDark  = lipgloss.NewStyle().Background(lipgloss.Color("#9E7A46")).Foreground(lipgloss.Color("#222222"))
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	msgStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+	lightSq       = lipgloss.NewStyle().Background(lipgloss.Color("#F0D9B5")).Foreground(lipgloss.Color("#1a1a1a"))
+	darkSq        = lipgloss.NewStyle().Background(lipgloss.Color("#B58863")).Foreground(lipgloss.Color("#1a1a1a"))
+	cursorSq      = lipgloss.NewStyle().Background(lipgloss.Color("#5BA3FF")).Foreground(lipgloss.Color("#ffffff"))
+	selectedSq    = lipgloss.NewStyle().Background(lipgloss.Color("#7FBF3F")).Foreground(lipgloss.Color("#ffffff"))
+	validLight    = lipgloss.NewStyle().Background(lipgloss.Color("#D8C87A")).Foreground(lipgloss.Color("#555555"))
+	validDark     = lipgloss.NewStyle().Background(lipgloss.Color("#9E7A46")).Foreground(lipgloss.Color("#222222"))
+	lastMoveLight = lipgloss.NewStyle().Background(lipgloss.Color("#CEB97A")).Foreground(lipgloss.Color("#1a1a1a"))
+	lastMoveDark  = lipgloss.NewStyle().Background(lipgloss.Color("#A07840")).Foreground(lipgloss.Color("#ffffff"))
+	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
 )
 
 var glyphs = map[chess.PieceType][2]string{
@@ -42,6 +44,8 @@ type model struct {
 	vsComputer    bool
 	computerColor chess.Color
 	thinking      bool
+	lastFrom      *chess.Square
+	lastTo        *chess.Square
 }
 
 func newModel() model {
@@ -223,6 +227,11 @@ func (m *model) executeMove(from, to chess.Square) {
 	}
 	m.game.Move(chosen)
 
+	f := chosen.S1()
+	m.lastFrom = &f
+	t := chosen.S2()
+	m.lastTo = &t
+
 	switch m.game.Outcome() {
 	case chess.WhiteWon:
 		m.message = "Checkmate! White wins!  (q to quit)"
@@ -291,6 +300,7 @@ func (m model) View() string {
 			isCursor := m.cursor[0] == row && m.cursor[1] == col
 			isSelected := m.selected != nil && (*m.selected)[0] == row && (*m.selected)[1] == col
 			isValidDest := m.validDests[sq]
+			isLastMove := (m.lastFrom != nil && *m.lastFrom == sq) || (m.lastTo != nil && *m.lastTo == sq)
 
 			var cell string
 			if piece == chess.NoPiece {
@@ -317,6 +327,10 @@ func (m model) View() string {
 				style = validLight
 			case isValidDest && !light:
 				style = validDark
+			case isLastMove && light:
+				style = lastMoveLight
+			case isLastMove && !light:
+				style = lastMoveDark
 			case light:
 				style = lightSq
 			default:
