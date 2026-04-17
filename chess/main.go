@@ -38,6 +38,7 @@ type model struct {
 	validDests    map[chess.Square]bool
 	message       string
 	modeSelect    bool
+	colorSelect   bool
 	vsComputer    bool
 	computerColor chess.Color
 	thinking      bool
@@ -89,9 +90,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.message = "White's turn"
 			case "2":
 				m.modeSelect = false
+				m.colorSelect = true
+			}
+			return m, nil
+		}
+
+		if m.colorSelect {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "w", "W":
+				m.colorSelect = false
 				m.vsComputer = true
 				m.computerColor = chess.Black
 				m.message = "White's turn"
+			case "b", "B":
+				m.colorSelect = false
+				m.vsComputer = true
+				m.computerColor = chess.White
+				m.thinking = true
+				m.message = "Computer is thinking..."
+				return m, computeMove(m.game)
 			}
 			return m, nil
 		}
@@ -235,8 +254,19 @@ func (m model) View() string {
 		sb.WriteString("\n\n")
 		sb.WriteString("  How do you want to play?\n\n")
 		sb.WriteString("  [1]  Two player\n")
-		sb.WriteString("  [2]  vs Computer  (you play White)\n\n")
+		sb.WriteString("  [2]  vs Computer\n\n")
 		sb.WriteString("  " + msgStyle.Render("Press 1 or 2") + "\n\n")
+		return sb.String()
+	}
+
+	if m.colorSelect {
+		var sb strings.Builder
+		sb.WriteString("\n ")
+		sb.WriteString(titleStyle.Render("Chess"))
+		sb.WriteString("\n\n")
+		sb.WriteString("  You play as...\n\n")
+		sb.WriteString("  [W]hite  or  [B]lack\n\n")
+		sb.WriteString("  " + msgStyle.Render("Press W or B") + "\n\n")
 		return sb.String()
 	}
 

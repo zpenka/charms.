@@ -18,7 +18,7 @@ go run .
 On launch, choose your mode:
 
 - `1` — Two player (pass and play)
-- `2` — vs Computer (you play White)
+- `2` — vs Computer, then choose your colour (`W` or `B`)
 
 **Controls:**
 
