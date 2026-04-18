@@ -38,6 +38,6 @@ Then choose your colour (`W` for White or `B` for Black).
 | `f` | Flip board perspective |
 | `q` | Quit |
 
-Valid move destinations are highlighted on the board. After every move, the from- and to-squares are tinted in amber. The board auto-flips when you play as Black; press `f` at any time to toggle. Move history is shown in algebraic notation below the board. The computer opponent uses a minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Search depth is determined by the selected difficulty level (2–4 ply).
+Valid move destinations are highlighted on the board. After every move, the from- and to-squares are tinted in amber. The board auto-flips when you play as Black; press `f` at any time to toggle. Each player has a 10-minute clock that counts down on their turn; clocks are displayed below the board. Move history is shown in algebraic notation below the board. The computer opponent uses a minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Search depth is determined by the selected difficulty level (2–4 ply).
 
 **Pawn promotion:** when you move a pawn to the back rank, a picker appears — press `Q`, `R`, `B`, or `N` to choose. The computer always promotes to a queen automatically.
