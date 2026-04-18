@@ -1,9 +1,12 @@
 package tapper
 
+import "math/rand"
+
 const (
-	Lanes    = 4
-	BarWidth = 24
-	MaxLives = 3
+	Lanes         = 4
+	BarWidth      = 24
+	MaxLives      = 3
+	LifeThreshold = 50
 )
 
 type gameState int
@@ -15,33 +18,47 @@ const (
 	StateLeaderboard
 )
 
+type customerKind int
+
+const (
+	KindNormal  customerKind = iota
+	KindThirsty              // moves faster, worth 2× points
+	KindVIP                  // moves slower, worth 5× points
+)
+
 type mug struct{ lane, x int }
 
 type customer struct {
 	lane, x      int
 	retreating   bool
 	moveInterval int
+	kind         customerKind
 }
 
 type serveAnim struct{ lane, x, frames int }
 
 type model struct {
-	bartender   int
-	mugs        []mug
-	customers   []customer
-	serveAnims  []serveAnim
-	score       int
-	lives       int
-	wave        int
-	tick        int
-	state       gameState
-	spawnsLeft  int
-	spawnTimer  int
-	nextLane    int
-	paused      bool
-	flashFrames int
-	scores      []ScoreEntry
-	scorePath   string
+	bartender      int
+	mugs           []mug
+	customers      []customer
+	serveAnims     []serveAnim
+	score          int
+	lives          int
+	wave           int
+	tick           int
+	state          gameState
+	spawnsLeft     int
+	spawnTimer     int
+	nextLane       int
+	paused         bool
+	flashFrames    int
+	combo          int
+	waveLongestCombo int
+	waveServes     int
+	waveBonus      int
+	nextLifeAt     int
+	scores         []ScoreEntry
+	scorePath      string
 }
 
 func newGame() model {
@@ -50,7 +67,12 @@ func newGame() model {
 }
 
 func newGameWithScores(scores []ScoreEntry, path string) model {
-	m := model{lives: MaxLives, scores: scores, scorePath: path}
+	m := model{
+		lives:      MaxLives,
+		nextLifeAt: LifeThreshold,
+		scores:     scores,
+		scorePath:  path,
+	}
 	return startWave(m)
 }
 
@@ -59,6 +81,10 @@ func startWave(m model) model {
 	m.customers = nil
 	m.serveAnims = nil
 	m.tick = 0
+	m.combo = 0
+	m.waveServes = 0
+	m.waveLongestCombo = 0
+	m.waveBonus = 0
 	m.spawnsLeft = spawnsForWave(m.wave)
 	m.spawnTimer = spawnInterval(m.wave)
 	m.nextLane = 0
@@ -95,8 +121,19 @@ func customerMoveInterval(wave int) int {
 	return 3
 }
 
-// tap fires a mug on the bartender's lane. A second mug is allowed if the
-// first has already passed the halfway point.
+func kindPoints(k customerKind) int {
+	switch k {
+	case KindThirsty:
+		return 2
+	case KindVIP:
+		return 5
+	default:
+		return 1
+	}
+}
+
+// tap fires a mug on the bartender's lane. A second mug is allowed once the
+// first has passed the halfway point.
 func tap(m model) model {
 	for _, mg := range m.mugs {
 		if mg.lane == m.bartender && mg.x < BarWidth/2 {
@@ -125,7 +162,7 @@ func advanceMugs(m model) model {
 }
 
 // advanceCustomers moves each customer according to its own moveInterval.
-// moveInterval==0 means always move (used by direct-construction test fixtures).
+// moveInterval==0 means always move (used by test fixtures).
 func advanceCustomers(m model) model {
 	var keep []customer
 	for _, c := range m.customers {
@@ -171,7 +208,18 @@ func checkCollisions(m model) model {
 			c := &m.customers[i]
 			if !c.retreating && mg.lane == c.lane && mg.x == c.x {
 				c.retreating = true
-				m.score++
+				m.combo++
+				if m.combo > m.waveLongestCombo {
+					m.waveLongestCombo = m.combo
+				}
+				m.score += kindPoints(c.kind) * m.combo
+				m.waveServes++
+				if m.score >= m.nextLifeAt {
+					if m.lives < MaxLives {
+						m.lives++
+					}
+					m.nextLifeAt += LifeThreshold
+				}
 				m.serveAnims = append(m.serveAnims, serveAnim{lane: mg.lane, x: mg.x, frames: 3})
 				hit = true
 				break
@@ -197,8 +245,20 @@ func tickServeAnims(m model) model {
 	return m
 }
 
-// spawnCustomer spawns the next customer, assigning a faster moveInterval to
-// later spawns within the wave (every 4 spawns, the interval drops by 1).
+func kindForWave(wave int) customerKind {
+	r := rand.Intn(100)
+	switch {
+	case wave >= 2 && r < 10:
+		return KindVIP
+	case r < 20:
+		return KindThirsty
+	default:
+		return KindNormal
+	}
+}
+
+// spawnCustomer spawns the next customer with kind-adjusted speed. Later
+// spawns within the wave get progressively faster (every 4 spawns, −1 tick).
 func spawnCustomer(m model) model {
 	lane := m.nextLane % Lanes
 	m.nextLane++
@@ -210,11 +270,29 @@ func spawnCustomer(m model) model {
 			interval = 2
 		}
 	}
-	m.customers = append(m.customers, customer{lane: lane, x: BarWidth - 1, moveInterval: interval})
+	kind := kindForWave(m.wave)
+	switch kind {
+	case KindThirsty:
+		if interval > 2 {
+			interval /= 2
+		}
+	case KindVIP:
+		interval += 6
+	}
+	m.customers = append(m.customers, customer{
+		lane:         lane,
+		x:            BarWidth - 1,
+		moveInterval: interval,
+		kind:         kind,
+	})
 	return m
 }
 
 func loseLife(m model) model {
+	if m.combo > m.waveLongestCombo {
+		m.waveLongestCombo = m.combo
+	}
+	m.combo = 0
 	m.lives--
 	if m.lives <= 0 {
 		m.state = StateGameOver
@@ -225,6 +303,14 @@ func loseLife(m model) model {
 	m.spawnTimer = spawnInterval(m.wave)
 	m.flashFrames = 4
 	return m
+}
+
+func calcWaveBonus(serves, total, longestCombo int) int {
+	b := longestCombo * 3
+	if serves == total {
+		b += 20
+	}
+	return b
 }
 
 func tickGame(m model) model {
@@ -245,7 +331,6 @@ func tickGame(m model) model {
 		m = checkCollisions(m)
 	}
 
-	// Per-customer intervals: advance every tick; each customer decides itself.
 	m = advanceCustomers(m)
 	m = checkBreaches(m)
 	if m.state != StatePlaying {
@@ -263,6 +348,12 @@ func tickGame(m model) model {
 	}
 
 	if m.spawnsLeft == 0 && len(m.customers) == 0 {
+		total := spawnsForWave(m.wave)
+		if m.combo > m.waveLongestCombo {
+			m.waveLongestCombo = m.combo
+		}
+		m.waveBonus = calcWaveBonus(m.waveServes, total, m.waveLongestCombo)
+		m.score += m.waveBonus
 		m.state = StateWaveClear
 		m.mugs = nil
 	}
