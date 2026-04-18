@@ -21,6 +21,7 @@ var (
 	lastMoveDark  = lipgloss.NewStyle().Background(lipgloss.Color("#A07840")).Foreground(lipgloss.Color("#ffffff"))
 	hintLight     = lipgloss.NewStyle().Background(lipgloss.Color("#B57BFF")).Foreground(lipgloss.Color("#ffffff"))
 	hintDark      = lipgloss.NewStyle().Background(lipgloss.Color("#8A50CC")).Foreground(lipgloss.Color("#ffffff"))
+	checkSq       = lipgloss.NewStyle().Background(lipgloss.Color("#CC3333")).Foreground(lipgloss.Color("#ffffff"))
 	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
 	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
 )
@@ -445,6 +446,26 @@ func (m *model) executePromotion(piece chess.PieceType) {
 	}
 }
 
+func inCheckSquare(g *chess.Game) (chess.Square, bool) {
+	moves := g.Moves()
+	if len(moves) == 0 {
+		return chess.A1, false
+	}
+	if !moves[len(moves)-1].HasTag(chess.Check) {
+		return chess.A1, false
+	}
+	pos := g.Position()
+	turn := pos.Turn()
+	board := pos.Board()
+	for sq := chess.A1; sq <= chess.H8; sq++ {
+		p := board.Piece(sq)
+		if p.Type() == chess.King && p.Color() == turn {
+			return sq, true
+		}
+	}
+	return chess.A1, false
+}
+
 func turnMsg(g *chess.Game) string {
 	if g.Position().Turn() == chess.White {
 		return "White's turn"
@@ -521,6 +542,8 @@ func (m model) View() string {
 			isValidDest := m.validDests[sq]
 			isLastMove := (m.lastFrom != nil && *m.lastFrom == sq) || (m.lastTo != nil && *m.lastTo == sq)
 			isHint := (m.hintFrom != nil && *m.hintFrom == sq) || (m.hintTo != nil && *m.hintTo == sq)
+			checkKingSq, inCheck := inCheckSquare(m.game)
+			isCheckKing := inCheck && sq == checkKingSq
 
 			var cell string
 			if piece == chess.NoPiece {
@@ -543,6 +566,8 @@ func (m model) View() string {
 				style = cursorSq
 			case isSelected:
 				style = selectedSq
+			case isCheckKing:
+				style = checkSq
 			case isValidDest && light:
 				style = validLight
 			case isValidDest && !light:
