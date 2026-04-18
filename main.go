@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charms/chess"
+	game2048 "charms/game2048"
 	"charms/snake"
 	"charms/tapper"
 
@@ -47,6 +48,12 @@ var games = []game{
 		desc:     "eat, grow, don't bite yourself",
 		run:      snake.Run,
 		topScore: snake.TopScore,
+	},
+	{
+		name:     "2048",
+		desc:     "slide tiles, merge numbers, reach 2048",
+		run:      game2048.Run,
+		topScore: game2048.TopScore,
 	},
 }
 

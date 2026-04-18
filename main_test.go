@@ -17,6 +17,18 @@ func TestGames_SnakeIsPresent(t *testing.T) {
 	}
 }
 
+func TestGames_2048IsPresent(t *testing.T) {
+	found := false
+	for _, g := range games {
+		if g.name == "2048" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("2048 should be in the games list")
+	}
+}
+
 func TestGames_AllHaveDescriptions(t *testing.T) {
 	for _, g := range games {
 		if g.desc == "" {
