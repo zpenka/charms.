@@ -1,0 +1,137 @@
+package tapper
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF6B6B"))
+	livesStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B"))
+	scoreStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
+	barStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	mugStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
+	customerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF9F43")).Bold(true)
+	bartenderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
+	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+	alertStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
+)
+
+type tickMsg struct{}
+
+func doTick() tea.Cmd {
+	return tea.Tick(50*time.Millisecond, func(time.Time) tea.Msg {
+		return tickMsg{}
+	})
+}
+
+func (m model) Init() tea.Cmd { return doTick() }
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tickMsg:
+		return tickGame(m), doTick()
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "up", "k":
+			if m.state == StatePlaying && m.bartender > 0 {
+				m.bartender--
+			}
+		case "down", "j":
+			if m.state == StatePlaying && m.bartender < Lanes-1 {
+				m.bartender++
+			}
+		case " ", "enter":
+			switch m.state {
+			case StatePlaying:
+				return tap(m), nil
+			case StateWaveClear:
+				m.wave++
+				return startWave(m), nil
+			case StateGameOver:
+				return newGame(), nil
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m model) View() string {
+	var sb strings.Builder
+
+	sb.WriteString("\n ")
+	sb.WriteString(titleStyle.Render("Tapper"))
+	sb.WriteString("\n\n ")
+	sb.WriteString(livesStyle.Render(strings.Repeat("♥ ", m.lives) + strings.Repeat("♡ ", MaxLives-m.lives)))
+	sb.WriteString(" ")
+	sb.WriteString(scoreStyle.Render(fmt.Sprintf("Score: %d", m.score)))
+	sb.WriteString("  ")
+	sb.WriteString(msgStyle.Render(fmt.Sprintf("Wave: %d", m.wave+1)))
+	sb.WriteString("\n\n")
+
+	// Build lookup maps for fast rendering
+	mugAt := make(map[[2]int]bool)
+	for _, mg := range m.mugs {
+		mugAt[[2]int{mg.lane, mg.x}] = true
+	}
+	custAt := make(map[[2]int]bool)
+	for _, c := range m.customers {
+		custAt[[2]int{c.lane, c.x}] = true
+	}
+
+	for lane := 0; lane < Lanes; lane++ {
+		if m.bartender == lane {
+			sb.WriteString(bartenderStyle.Render(" ☻ "))
+		} else {
+			sb.WriteString("   ")
+		}
+		sb.WriteString(barStyle.Render("│"))
+
+		for x := 0; x < BarWidth; x++ {
+			switch {
+			case mugAt[[2]int{lane, x}]:
+				sb.WriteString(mugStyle.Render("o"))
+			case custAt[[2]int{lane, x}]:
+				sb.WriteString(customerStyle.Render("@"))
+			default:
+				sb.WriteString(barStyle.Render("·"))
+			}
+		}
+
+		sb.WriteString(barStyle.Render("│"))
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n")
+
+	switch m.state {
+	case StateWaveClear:
+		sb.WriteString(alertStyle.Render(fmt.Sprintf(" Wave %d complete! +%d bonus", m.wave+1, m.wave*10)))
+		sb.WriteString("\n ")
+		sb.WriteString(msgStyle.Render("Press Space to continue"))
+		sb.WriteString("\n\n")
+	case StateGameOver:
+		sb.WriteString(livesStyle.Render(fmt.Sprintf(" Game over!  Final score: %d", m.score)))
+		sb.WriteString("\n ")
+		sb.WriteString(msgStyle.Render("Press Space to play again  q to quit"))
+		sb.WriteString("\n\n")
+	default:
+		sb.WriteString(msgStyle.Render(" ↑↓ / jk  move   Space  tap   q  quit"))
+		sb.WriteString("\n\n")
+	}
+
+	return sb.String()
+}
+
+func Run() {
+	p := tea.NewProgram(newGame(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("error: %v\n", err)
+	}
+}

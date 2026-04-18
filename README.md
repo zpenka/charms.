@@ -72,3 +72,19 @@ Then choose your colour (`W` for White or `B` for Black).
 Valid move destinations are highlighted on the board. After every move, the from- and to-squares are tinted in amber. When the active king is in check, its square is highlighted red. The board auto-flips when you play as Black; press `f` at any time to toggle. Each player's clock counts down on their turn; clocks are displayed below the board. Move history is shown in algebraic notation below the board. The computer opponent uses a minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Search depth is determined by the selected difficulty level (2–4 ply).
 
 **Pawn promotion:** when you move a pawn to the back rank, a picker appears — press `Q`, `R`, `B`, or `N` to choose. The computer always promotes to a queen automatically.
+
+---
+
+### Tapper
+
+A terminal take on the classic 1983 arcade game. Slide beer mugs down four bar lanes to serve customers walking in from the right. Miss a customer and your mug falls off the end — lose a life. Let a customer reach the bar — lose a life. Three lives per game, eight waves to start.
+
+**Controls:**
+
+| Key | Action |
+|-----|--------|
+| `↑↓` / `jk` | Move bartender between lanes |
+| `Space` / `Enter` | Tap (fire a mug) |
+| `q` | Quit to lobby |
+
+One mug per lane at a time. Customers walk faster each wave, and more of them spawn. Serve all customers in a wave to advance.
