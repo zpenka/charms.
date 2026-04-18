@@ -19,6 +19,8 @@ var (
 	validDark     = lipgloss.NewStyle().Background(lipgloss.Color("#9E7A46")).Foreground(lipgloss.Color("#222222"))
 	lastMoveLight = lipgloss.NewStyle().Background(lipgloss.Color("#CEB97A")).Foreground(lipgloss.Color("#1a1a1a"))
 	lastMoveDark  = lipgloss.NewStyle().Background(lipgloss.Color("#A07840")).Foreground(lipgloss.Color("#ffffff"))
+	hintLight     = lipgloss.NewStyle().Background(lipgloss.Color("#B57BFF")).Foreground(lipgloss.Color("#ffffff"))
+	hintDark      = lipgloss.NewStyle().Background(lipgloss.Color("#8A50CC")).Foreground(lipgloss.Color("#ffffff"))
 	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
 	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
 )
@@ -33,6 +35,14 @@ var glyphs = map[chess.PieceType][2]string{
 }
 
 type computerMoveMsg struct{ move *chess.Move }
+type hintMsg struct{ move *chess.Move }
+
+func computeHint(g *chess.Game, depth int) tea.Cmd {
+	snapshot := g.Clone()
+	return func() tea.Msg {
+		return hintMsg{bestMoveAtDepth(snapshot, depth)}
+	}
+}
 
 type tickMsg time.Time
 
@@ -70,6 +80,9 @@ type model struct {
 	promotionFrom chess.Square
 	promotionTo   chess.Square
 	flipped       bool
+	hintFrom      *chess.Square
+	hintTo        *chess.Square
+	hinting       bool
 	whiteTime     time.Duration
 	blackTime     time.Duration
 	clockOn       bool
@@ -132,6 +145,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.executeMove(cmsg.move.S1(), cmsg.move.S2())
 		}
 		m.thinking = false
+		return m, nil
+	}
+
+	if hmsg, ok := msg.(hintMsg); ok {
+		m.hinting = false
+		if hmsg.move != nil {
+			f := hmsg.move.S1()
+			m.hintFrom = &f
+			t := hmsg.move.S2()
+			m.hintTo = &t
+		}
 		return m, nil
 	}
 
@@ -263,6 +287,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "f":
 			m.flipped = !m.flipped
+		case "?":
+			m.hintFrom = nil
+			m.hintTo = nil
+			m.hinting = true
+			return m, computeHint(m.game, 2)
 		case "enter", " ":
 			return m.handleSelect()
 		case "esc":
@@ -364,6 +393,8 @@ func (m *model) executeMove(from, to chess.Square) {
 	m.lastFrom = &f
 	t := chosen.S2()
 	m.lastTo = &t
+	m.hintFrom = nil
+	m.hintTo = nil
 
 	switch m.game.Outcome() {
 	case chess.WhiteWon:
@@ -479,6 +510,7 @@ func (m model) View() string {
 			isSelected := m.selected != nil && (*m.selected)[0] == row && (*m.selected)[1] == col
 			isValidDest := m.validDests[sq]
 			isLastMove := (m.lastFrom != nil && *m.lastFrom == sq) || (m.lastTo != nil && *m.lastTo == sq)
+			isHint := (m.hintFrom != nil && *m.hintFrom == sq) || (m.hintTo != nil && *m.hintTo == sq)
 
 			var cell string
 			if piece == chess.NoPiece {
@@ -505,6 +537,10 @@ func (m model) View() string {
 				style = validLight
 			case isValidDest && !light:
 				style = validDark
+			case isHint && light:
+				style = hintLight
+			case isHint && !light:
+				style = hintDark
 			case isLastMove && light:
 				style = lastMoveLight
 			case isLastMove && !light:
@@ -523,6 +559,9 @@ func (m model) View() string {
 
 	sb.WriteString(fileLabels + "\n")
 	sb.WriteString(" " + msgStyle.Render(m.message) + "\n\n")
+	if m.hinting {
+		sb.WriteString(" " + msgStyle.Render("Finding hint...") + "\n\n")
+	}
 	sb.WriteString(fmt.Sprintf("  White: %s   Black: %s\n\n",
 		formatClock(m.whiteTime), formatClock(m.blackTime)))
 
@@ -544,7 +583,7 @@ func (m model) View() string {
 	sb.WriteString(" ↑↓←→ / hjkl  move cursor\n")
 	sb.WriteString(" Enter / Space  select / move\n")
 	sb.WriteString(" Esc  cancel selection   q  quit\n")
-	sb.WriteString(" f  flip board\n\n")
+	sb.WriteString(" f  flip board   ?  hint\n\n")
 
 	return sb.String()
 }
