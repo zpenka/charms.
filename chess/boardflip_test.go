@@ -49,8 +49,10 @@ func TestBoardFlip_AutoFlipWhenPlayingBlack(t *testing.T) {
 	m := newModel()
 	m.modeSelect = true
 
-	// Press 2 to go to vs computer (now lands on diffSelect)
+	// Press 2 → timeSelect, then pick blitz to proceed
 	updated, _ := m.Update(key("2"))
+	m = updated.(model)
+	updated, _ = m.Update(key("2"))
 	m = updated.(model)
 
 	// Press 2 to choose medium difficulty

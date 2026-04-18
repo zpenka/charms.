@@ -13,14 +13,18 @@ func TestDifficultySelect_PressTwoGoesToDiffSelect(t *testing.T) {
 	m := newModel()
 	m.modeSelect = true
 
+	// Press 2 → timeSelect (time control comes first now)
 	updated, _ := m.Update(key("2"))
+	m = updated.(model)
+	// Pick rapid time control to proceed to diffSelect
+	updated, _ = m.Update(key("3"))
 	got := updated.(model)
 
-	if got.modeSelect {
-		t.Error("modeSelect should be false after pressing 2")
+	if got.timeSelect {
+		t.Error("timeSelect should be false after choosing time")
 	}
 	if !got.diffSelect {
-		t.Error("diffSelect should be true after pressing 2 in modeSelect")
+		t.Error("diffSelect should be true after modeSelect→2→timeSelect→3")
 	}
 	if got.colorSelect {
 		t.Error("colorSelect should NOT be true yet — must choose difficulty first")
@@ -138,12 +142,14 @@ func TestComputeMove_UsesSelectedDifficulty(t *testing.T) {
 	m := newModel()
 	m.modeSelect = true
 
-	// Press "2" to choose vs computer — should go to diffSelect
+	// Press "2" → timeSelect, then pick rapid → diffSelect
 	updated, _ := m.Update(key("2"))
+	m = updated.(model)
+	updated, _ = m.Update(key("3"))
 	m = updated.(model)
 
 	if !m.diffSelect {
-		t.Fatal("expected diffSelect=true after pressing 2 in modeSelect")
+		t.Fatal("expected diffSelect=true after modeSelect→2→timeSelect→3")
 	}
 
 	// Press "1" to choose Easy difficulty — should go to colorSelect
