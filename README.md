@@ -48,6 +48,13 @@ When playing vs Computer, you will then choose a difficulty level:
 - `2` — Medium (search depth 3 — balanced)
 - `3` — Hard (search depth 4 — strongest)
 
+After the time control, choose a board color scheme:
+
+- `1` — Classic (wood tones)
+- `2` — Ocean (blue)
+- `3` — Mint (green)
+- `4` — Dusk (purple)
+
 Then choose your colour (`W` for White or `B` for Black).
 
 **Controls:**

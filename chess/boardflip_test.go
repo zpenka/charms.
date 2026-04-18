@@ -49,10 +49,12 @@ func TestBoardFlip_AutoFlipWhenPlayingBlack(t *testing.T) {
 	m := newModel()
 	m.modeSelect = true
 
-	// Press 2 → timeSelect, then pick blitz to proceed
+	// Press 2 → timeSelect → schemeSelect → diffSelect
 	updated, _ := m.Update(key("2"))
 	m = updated.(model)
-	updated, _ = m.Update(key("2"))
+	updated, _ = m.Update(key("2")) // blitz
+	m = updated.(model)
+	updated, _ = m.Update(key("1")) // classic scheme
 	m = updated.(model)
 
 	// Press 2 to choose medium difficulty

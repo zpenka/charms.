@@ -73,8 +73,9 @@ func TestTimeSelect_TwoPlayerRoutesToGame(t *testing.T) {
 	if got.colorSelect {
 		t.Error("two-player path should not go to colorSelect")
 	}
-	if got.message != "White's turn" {
-		t.Errorf("message = %q, want \"White's turn\"", got.message)
+	// scheme selection comes next, not game start directly
+	if !got.schemeSelect {
+		t.Error("timeSelect should route to schemeSelect")
 	}
 }
 
@@ -84,11 +85,15 @@ func TestTimeSelect_VsComputerRoutesToDiffSelect(t *testing.T) {
 	m.pendingVsComputer = true
 	updated, _ := m.Update(key("2"))
 	got := updated.(model)
-	if !got.diffSelect {
-		t.Error("vs-computer path should go to diffSelect")
+	if got.diffSelect {
+		t.Error("should not jump straight to diffSelect — scheme select comes first")
 	}
-	if got.pendingVsComputer {
-		t.Error("pendingVsComputer should be cleared after routing")
+	if !got.schemeSelect {
+		t.Error("timeSelect should route to schemeSelect before diffSelect")
+	}
+	// pendingVsComputer must survive into schemeSelect so it can route onward
+	if !got.pendingVsComputer {
+		t.Error("pendingVsComputer should be preserved through to schemeSelect")
 	}
 }
 
