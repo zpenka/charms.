@@ -179,7 +179,7 @@ func minimax(pos *chess.Position, depth, alpha, beta int) int {
 	return best
 }
 
-func bestMove(g *chess.Game) *chess.Move {
+func bestMoveAtDepth(g *chess.Game, depth int) *chess.Move {
 	pos := g.Position()
 	moves := orderMoves(pos, pos.ValidMoves())
 	if len(moves) == 0 {
@@ -190,7 +190,7 @@ func bestMove(g *chess.Game) *chess.Move {
 	if pos.Turn() == chess.White {
 		bestScore := math.MinInt32
 		for _, mv := range moves {
-			score := minimax(pos.Update(mv), searchDepth-1, math.MinInt32, math.MaxInt32)
+			score := minimax(pos.Update(mv), depth-1, math.MinInt32, math.MaxInt32)
 			if score > bestScore {
 				bestScore = score
 				best = mv
@@ -199,7 +199,7 @@ func bestMove(g *chess.Game) *chess.Move {
 	} else {
 		bestScore := math.MaxInt32
 		for _, mv := range moves {
-			score := minimax(pos.Update(mv), searchDepth-1, math.MinInt32, math.MaxInt32)
+			score := minimax(pos.Update(mv), depth-1, math.MinInt32, math.MaxInt32)
 			if score < bestScore {
 				bestScore = score
 				best = mv
@@ -207,4 +207,12 @@ func bestMove(g *chess.Game) *chess.Move {
 		}
 	}
 	return best
+}
+
+func bestMove(g *chess.Game) *chess.Move {
+	return bestMoveAtDepth(g, searchDepth)
+}
+
+func depthForDifficulty(d int) int {
+	return d + 1
 }
