@@ -18,12 +18,15 @@ var (
 	custSafeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ECC71")).Bold(true)
 	custWarnStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#F39C12")).Bold(true)
 	custDangerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#E74C3C")).Bold(true)
+	thirstyStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4500")).Bold(true)
+	vipStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Bold(true)
 	bartenderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
 	msgStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
 	alertStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
 	flashStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#E74C3C")).Bold(true)
 	pauseStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
 	serveStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+	comboStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")).Bold(true)
 )
 
 type tickMsg struct{}
@@ -92,6 +95,10 @@ func (m model) View() string {
 	sb.WriteString(msgStyle.Render(fmt.Sprintf("Wave: %d", m.wave+1)))
 	sb.WriteString("  ")
 	sb.WriteString(msgStyle.Render(fmt.Sprintf("▸ %d remaining", m.spawnsLeft+len(m.customers))))
+	if m.combo > 1 {
+		sb.WriteString("  ")
+		sb.WriteString(comboStyle.Render(fmt.Sprintf("Combo ×%d", m.combo)))
+	}
 	sb.WriteString("\n\n")
 
 	if m.paused {
@@ -99,14 +106,17 @@ func (m model) View() string {
 		sb.WriteString("\n\n")
 	}
 
-	// Build lookup maps for fast rendering
+	// Build lookup maps for rendering
 	mugAt := make(map[[2]int]bool)
 	for _, mg := range m.mugs {
 		mugAt[[2]int{mg.lane, mg.x}] = true
 	}
-	custAt := make(map[[2]int]bool)
+	type custRender struct {
+		kind customerKind
+	}
+	custAt := make(map[[2]int]custRender)
 	for _, c := range m.customers {
-		custAt[[2]int{c.lane, c.x}] = true
+		custAt[[2]int{c.lane, c.x}] = custRender{c.kind}
 	}
 	serveAt := make(map[[2]int]bool)
 	for _, a := range m.serveAnims {
@@ -130,17 +140,25 @@ func (m model) View() string {
 				sb.WriteString(serveStyle.Render("*"))
 			case mugAt[key]:
 				sb.WriteString(mugStyle.Render("o"))
-			case custAt[key]:
-				var cs lipgloss.Style
-				switch {
-				case x >= BarWidth*2/3:
-					cs = custSafeStyle
-				case x >= BarWidth/3:
-					cs = custWarnStyle
+			case custAt[key] != (custRender{}):
+				cr := custAt[key]
+				switch cr.kind {
+				case KindThirsty:
+					sb.WriteString(thirstyStyle.Render("!"))
+				case KindVIP:
+					sb.WriteString(vipStyle.Render("$"))
 				default:
-					cs = custDangerStyle
+					var cs lipgloss.Style
+					switch {
+					case x >= BarWidth*2/3:
+						cs = custSafeStyle
+					case x >= BarWidth/3:
+						cs = custWarnStyle
+					default:
+						cs = custDangerStyle
+					}
+					sb.WriteString(cs.Render("@"))
 				}
-				sb.WriteString(cs.Render("@"))
 			default:
 				sb.WriteString(barStyle.Render("·"))
 			}
@@ -154,8 +172,18 @@ func (m model) View() string {
 
 	switch m.state {
 	case StateWaveClear:
-		sb.WriteString(alertStyle.Render(fmt.Sprintf(" Wave %d complete! +%d bonus", m.wave+1, m.wave*10)))
-		sb.WriteString("\n ")
+		total := spawnsForWave(m.wave)
+		sb.WriteString(alertStyle.Render(fmt.Sprintf(" Wave %d complete!", m.wave+1)))
+		sb.WriteString("\n\n")
+		sb.WriteString(msgStyle.Render(fmt.Sprintf("  Served:  %d / %d", m.waveServes, total)))
+		if m.waveServes == total {
+			sb.WriteString(alertStyle.Render("  perfect!"))
+		}
+		sb.WriteString("\n")
+		sb.WriteString(msgStyle.Render(fmt.Sprintf("  Combo:   %dx best", m.waveLongestCombo)))
+		sb.WriteString("\n")
+		sb.WriteString(alertStyle.Render(fmt.Sprintf("  Bonus:   +%d", m.waveBonus)))
+		sb.WriteString("\n\n ")
 		sb.WriteString(msgStyle.Render("Press Space to continue"))
 		sb.WriteString("\n\n")
 	case StateGameOver:

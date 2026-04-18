@@ -488,3 +488,205 @@ func TestAdvanceCustomers_RespectsPerCustomerInterval(t *testing.T) {
 		t.Errorf("customer should move when tick%%interval == 0, x = %d", m.customers[0].x)
 	}
 }
+
+// ── feature 1: combo multiplier ────────────────────────────────────────────
+
+func TestCheckCollisions_IncreasesCombo(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: 5}}, []customer{{lane: 0, x: 5}})
+	m = checkCollisions(m)
+	if m.combo != 1 {
+		t.Errorf("combo = %d, want 1 after first serve", m.combo)
+	}
+}
+
+func TestCheckCollisions_ScoreUsesComboMultiplier(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: 5}}, []customer{{lane: 0, x: 5}})
+	m.combo = 2
+	m = checkCollisions(m)
+	// combo increments to 3; normal kind worth 1 pt × combo 3 = 3
+	if m.score != 3 {
+		t.Errorf("score = %d, want 3 (1pt × combo 3)", m.score)
+	}
+}
+
+func TestLoseLife_ResetsCombo(t *testing.T) {
+	m := newGame()
+	m.combo = 5
+	m.lives = 2
+	m = loseLife(m)
+	if m.combo != 0 {
+		t.Errorf("combo = %d, want 0 after losing life", m.combo)
+	}
+}
+
+func TestAdvanceMugs_MissResetsCombo(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: BarWidth - 1}}, nil)
+	m.combo = 3
+	m = advanceMugs(m)
+	if m.combo != 0 {
+		t.Errorf("combo = %d, want 0 after mug miss", m.combo)
+	}
+}
+
+// ── feature 2: special customer kinds ──────────────────────────────────────
+
+func TestCheckCollisions_ThirstyCustomerWorthDouble(t *testing.T) {
+	m := modelWith(
+		[]mug{{lane: 0, x: 5}},
+		[]customer{{lane: 0, x: 5, kind: KindThirsty}},
+	)
+	m = checkCollisions(m)
+	// combo=1, thirsty base=2 → score = 2×1 = 2
+	if m.score != 2 {
+		t.Errorf("score = %d, want 2 for thirsty customer", m.score)
+	}
+}
+
+func TestCheckCollisions_VIPCustomerWorthFive(t *testing.T) {
+	m := modelWith(
+		[]mug{{lane: 0, x: 5}},
+		[]customer{{lane: 0, x: 5, kind: KindVIP}},
+	)
+	m = checkCollisions(m)
+	// combo=1, VIP base=5 → score = 5×1 = 5
+	if m.score != 5 {
+		t.Errorf("score = %d, want 5 for VIP customer", m.score)
+	}
+}
+
+func TestSpawnCustomer_ThirstyHasFasterInterval(t *testing.T) {
+	m := newGame()
+	baseInterval := customerMoveInterval(m.wave)
+	// Force a thirsty spawn directly
+	m.customers = append(m.customers, customer{
+		lane: 0, x: BarWidth - 1, kind: KindThirsty,
+		moveInterval: max(baseInterval/2, 2),
+	})
+	if m.customers[0].moveInterval >= baseInterval {
+		t.Errorf("thirsty interval %d should be less than base %d",
+			m.customers[0].moveInterval, baseInterval)
+	}
+}
+
+func TestSpawnCustomer_VIPHasSlowerInterval(t *testing.T) {
+	m := newGame()
+	baseInterval := customerMoveInterval(m.wave)
+	m.customers = append(m.customers, customer{
+		lane: 0, x: BarWidth - 1, kind: KindVIP,
+		moveInterval: baseInterval + 6,
+	})
+	if m.customers[0].moveInterval <= baseInterval {
+		t.Errorf("VIP interval %d should be greater than base %d",
+			m.customers[0].moveInterval, baseInterval)
+	}
+}
+
+// ── feature 3: extra life at score threshold ────────────────────────────────
+
+func TestExtraLife_AwardedAtThreshold(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: 5}}, []customer{{lane: 0, x: 5}})
+	m.lives = 2
+	m.score = LifeThreshold - 1
+	m.nextLifeAt = LifeThreshold
+	m = checkCollisions(m)
+	if m.lives != 3 {
+		t.Errorf("lives = %d, want 3 after crossing threshold", m.lives)
+	}
+}
+
+func TestExtraLife_NotExceedMaxLives(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: 5}}, []customer{{lane: 0, x: 5}})
+	m.lives = MaxLives
+	m.score = LifeThreshold - 1
+	m.nextLifeAt = LifeThreshold
+	m = checkCollisions(m)
+	if m.lives != MaxLives {
+		t.Errorf("lives = %d, should not exceed MaxLives %d", m.lives, MaxLives)
+	}
+}
+
+func TestExtraLife_NextThresholdAdvances(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: 5}}, []customer{{lane: 0, x: 5}})
+	m.lives = 2
+	m.score = LifeThreshold - 1
+	m.nextLifeAt = LifeThreshold
+	m = checkCollisions(m)
+	if m.nextLifeAt != LifeThreshold*2 {
+		t.Errorf("nextLifeAt = %d, want %d", m.nextLifeAt, LifeThreshold*2)
+	}
+}
+
+// ── feature 4: wave summary ─────────────────────────────────────────────────
+
+func TestWaveSummary_TracksServes(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: 5}}, []customer{{lane: 0, x: 5}})
+	m = checkCollisions(m)
+	if m.waveServes != 1 {
+		t.Errorf("waveServes = %d, want 1", m.waveServes)
+	}
+}
+
+func TestWaveSummary_TracksLongestCombo(t *testing.T) {
+	m := newGame()
+	m.combo = 4
+	m.lives = 2
+	m = loseLife(m)
+	if m.waveLongestCombo != 4 {
+		t.Errorf("waveLongestCombo = %d, want 4", m.waveLongestCombo)
+	}
+}
+
+func TestWaveSummary_ComboUpdatedOnServe(t *testing.T) {
+	m := modelWith([]mug{{lane: 0, x: 5}}, []customer{{lane: 0, x: 5}})
+	m.combo = 6
+	m = checkCollisions(m)
+	if m.waveLongestCombo != 7 {
+		t.Errorf("waveLongestCombo = %d, want 7", m.waveLongestCombo)
+	}
+}
+
+func TestWaveSummary_StartWaveClearsStats(t *testing.T) {
+	m := newGame()
+	m.waveServes = 5
+	m.waveLongestCombo = 3
+	m = startWave(m)
+	if m.waveServes != 0 || m.waveLongestCombo != 0 {
+		t.Error("startWave should reset waveServes and waveLongestCombo")
+	}
+}
+
+func TestCalcWaveBonus_JustCombo(t *testing.T) {
+	if got := calcWaveBonus(0, 10, 5); got != 15 {
+		t.Errorf("calcWaveBonus = %d, want 15 (combo×3)", got)
+	}
+}
+
+func TestCalcWaveBonus_PerfectClearAdds20(t *testing.T) {
+	if got := calcWaveBonus(10, 10, 0); got != 20 {
+		t.Errorf("calcWaveBonus = %d, want 20 (perfect clear)", got)
+	}
+}
+
+func TestCalcWaveBonus_ComboPlusPerfect(t *testing.T) {
+	if got := calcWaveBonus(10, 10, 5); got != 35 {
+		t.Errorf("calcWaveBonus = %d, want 35 (combo×3 + perfect)", got)
+	}
+}
+
+func TestWaveBonus_AddedToScoreOnClear(t *testing.T) {
+	m := newGame()
+	m.spawnsLeft = 0
+	m.customers = nil
+	m.waveServes = spawnsForWave(0) // perfect wave
+	m.waveLongestCombo = 0
+	m.tick = 999
+	before := m.score
+	m = tickGame(m)
+	if m.state != StateWaveClear {
+		t.Fatal("should be StateWaveClear")
+	}
+	want := calcWaveBonus(spawnsForWave(0), spawnsForWave(0), 0)
+	if m.score != before+want {
+		t.Errorf("score = %d, want %d (bonus applied on clear)", m.score, before+want)
+	}
+}

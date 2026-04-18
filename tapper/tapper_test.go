@@ -127,3 +127,68 @@ func TestView_GameOverShowsLeaderboardPrompt(t *testing.T) {
 		t.Error("game over view should mention leaderboard")
 	}
 }
+
+// combo
+
+func TestView_ShowsComboWhenActive(t *testing.T) {
+	m := newGame()
+	m.combo = 3
+	if !strings.Contains(m.View(), "Combo") {
+		t.Error("view should show Combo label when combo > 1")
+	}
+}
+
+func TestView_HidesComboWhenZero(t *testing.T) {
+	m := newGame()
+	m.combo = 0
+	if strings.Contains(m.View(), "Combo") {
+		t.Error("view should not show Combo when combo is 0")
+	}
+}
+
+// special customers
+
+func TestView_ShowsThirstyCustomer(t *testing.T) {
+	m := newGame()
+	m.customers = []customer{{lane: 0, x: 5, kind: KindThirsty}}
+	if !strings.Contains(m.View(), "!") {
+		t.Error("thirsty customer should render as !")
+	}
+}
+
+func TestView_ShowsVIPCustomer(t *testing.T) {
+	m := newGame()
+	m.customers = []customer{{lane: 0, x: 5, kind: KindVIP}}
+	if !strings.Contains(m.View(), "$") {
+		t.Error("VIP customer should render as $")
+	}
+}
+
+// wave summary
+
+func TestView_WaveClearShowsServes(t *testing.T) {
+	m := newGame()
+	m.state = StateWaveClear
+	m.waveServes = 11
+	if !strings.Contains(m.View(), "11") {
+		t.Error("wave clear view should show serve count")
+	}
+}
+
+func TestView_WaveClearShowsLongestCombo(t *testing.T) {
+	m := newGame()
+	m.state = StateWaveClear
+	m.waveLongestCombo = 9
+	if !strings.Contains(m.View(), "9") {
+		t.Error("wave clear view should show longest combo")
+	}
+}
+
+func TestView_WaveClearShowsBonus(t *testing.T) {
+	m := newGame()
+	m.state = StateWaveClear
+	m.waveBonus = 35
+	if !strings.Contains(m.View(), "35") {
+		t.Error("wave clear view should show wave bonus")
+	}
+}
