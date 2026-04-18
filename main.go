@@ -1,0 +1,114 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"charms/chess"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	lobbyTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	lobbySubtitle = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+	lobbyActive   = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true)
+	lobbyInactive = lipgloss.NewStyle().Foreground(lipgloss.Color("#DDDDDD"))
+)
+
+type game struct {
+	name string
+	run  func()
+}
+
+var games = []game{
+	{"Chess", chess.Run},
+}
+
+type lobbyModel struct {
+	cursor int
+	chosen int // -1 = none chosen yet
+}
+
+func newLobbyModel() lobbyModel {
+	return lobbyModel{chosen: -1}
+}
+
+func (m lobbyModel) Init() tea.Cmd { return nil }
+
+func (m lobbyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if km, ok := msg.(tea.KeyMsg); ok {
+		switch km.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(games)-1 {
+				m.cursor++
+			}
+		case "enter", " ":
+			m.chosen = m.cursor
+			return m, tea.Quit
+		default:
+			// number shortcut: "1" selects game 0, etc.
+			if len(km.String()) == 1 && km.String() >= "1" && km.String() <= "9" {
+				idx := int(km.String()[0]-'1')
+				if idx < len(games) {
+					m.chosen = idx
+					return m, tea.Quit
+				}
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m lobbyModel) View() string {
+	var sb strings.Builder
+	sb.WriteString("\n ")
+	sb.WriteString(lobbyTitle.Render("charms."))
+	sb.WriteString("\n\n ")
+	sb.WriteString(lobbySubtitle.Render("what do you want to play?"))
+	sb.WriteString("\n\n")
+
+	for i, g := range games {
+		if i == m.cursor {
+			sb.WriteString(fmt.Sprintf("  %s [%d]  %s\n",
+				lobbyActive.Render("►"),
+				i+1,
+				lobbyActive.Render(g.name),
+			))
+		} else {
+			sb.WriteString(fmt.Sprintf("    [%d]  %s\n",
+				i+1,
+				lobbyInactive.Render(g.name),
+			))
+		}
+	}
+
+	sb.WriteString("\n ")
+	sb.WriteString(lobbySubtitle.Render("↑↓ / jk  navigate   Enter  play   q  quit"))
+	sb.WriteString("\n\n")
+	return sb.String()
+}
+
+func main() {
+	for {
+		p := tea.NewProgram(newLobbyModel(), tea.WithAltScreen())
+		result, err := p.Run()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		m := result.(lobbyModel)
+		if m.chosen < 0 {
+			break
+		}
+		games[m.chosen].run()
+	}
+}
