@@ -10,20 +10,31 @@ import (
 	"github.com/notnil/chess"
 )
 
+type boardScheme struct {
+	name      string
+	light     string
+	dark      string
+	moveLight string
+	moveDark  string
+}
+
+var schemes = []boardScheme{
+	{"Classic", "#F0D9B5", "#B58863", "#CEB97A", "#A07840"},
+	{"Ocean",   "#C8DDF0", "#4A79A5", "#9BBFE0", "#2E5F85"},
+	{"Mint",    "#C8EBC8", "#4A804A", "#96CC96", "#2E602E"},
+	{"Dusk",    "#E0C8F0", "#7B5EA7", "#C8A0E0", "#5B3E87"},
+}
+
 var (
-	lightSq       = lipgloss.NewStyle().Background(lipgloss.Color("#F0D9B5")).Foreground(lipgloss.Color("#1a1a1a"))
-	darkSq        = lipgloss.NewStyle().Background(lipgloss.Color("#B58863")).Foreground(lipgloss.Color("#1a1a1a"))
-	cursorSq      = lipgloss.NewStyle().Background(lipgloss.Color("#5BA3FF")).Foreground(lipgloss.Color("#ffffff"))
-	selectedSq    = lipgloss.NewStyle().Background(lipgloss.Color("#7FBF3F")).Foreground(lipgloss.Color("#ffffff"))
-	validLight    = lipgloss.NewStyle().Background(lipgloss.Color("#D8C87A")).Foreground(lipgloss.Color("#555555"))
-	validDark     = lipgloss.NewStyle().Background(lipgloss.Color("#9E7A46")).Foreground(lipgloss.Color("#222222"))
-	lastMoveLight = lipgloss.NewStyle().Background(lipgloss.Color("#CEB97A")).Foreground(lipgloss.Color("#1a1a1a"))
-	lastMoveDark  = lipgloss.NewStyle().Background(lipgloss.Color("#A07840")).Foreground(lipgloss.Color("#ffffff"))
-	hintLight     = lipgloss.NewStyle().Background(lipgloss.Color("#B57BFF")).Foreground(lipgloss.Color("#ffffff"))
-	hintDark      = lipgloss.NewStyle().Background(lipgloss.Color("#8A50CC")).Foreground(lipgloss.Color("#ffffff"))
-	checkSq       = lipgloss.NewStyle().Background(lipgloss.Color("#CC3333")).Foreground(lipgloss.Color("#ffffff"))
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+	cursorSq   = lipgloss.NewStyle().Background(lipgloss.Color("#5BA3FF")).Foreground(lipgloss.Color("#ffffff"))
+	selectedSq = lipgloss.NewStyle().Background(lipgloss.Color("#7FBF3F")).Foreground(lipgloss.Color("#ffffff"))
+	validLight = lipgloss.NewStyle().Background(lipgloss.Color("#D8C87A")).Foreground(lipgloss.Color("#555555"))
+	validDark  = lipgloss.NewStyle().Background(lipgloss.Color("#9E7A46")).Foreground(lipgloss.Color("#222222"))
+	hintLight  = lipgloss.NewStyle().Background(lipgloss.Color("#B57BFF")).Foreground(lipgloss.Color("#ffffff"))
+	hintDark   = lipgloss.NewStyle().Background(lipgloss.Color("#8A50CC")).Foreground(lipgloss.Color("#ffffff"))
+	checkSq    = lipgloss.NewStyle().Background(lipgloss.Color("#CC3333")).Foreground(lipgloss.Color("#ffffff"))
+	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	msgStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
 )
 
 var glyphs = map[chess.PieceType][2]string{
@@ -83,13 +94,15 @@ type model struct {
 	flipped       bool
 	hintFrom      *chess.Square
 	hintTo        *chess.Square
-	hinting            bool
-	resigned           bool
-	timeSelect         bool
-	pendingVsComputer  bool
-	whiteTime          time.Duration
-	blackTime          time.Duration
-	clockOn            bool
+	hinting           bool
+	resigned          bool
+	timeSelect        bool
+	schemeSelect      bool
+	schemeIdx         int
+	pendingVsComputer bool
+	whiteTime         time.Duration
+	blackTime         time.Duration
+	clockOn           bool
 }
 
 func (m model) boardSquare(row, col int) chess.Square {
@@ -216,6 +229,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.whiteTime = d
 				m.blackTime = d
 				m.timeSelect = false
+				m.schemeSelect = true
+			}
+			return m, nil
+		}
+
+		if m.schemeSelect {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "1", "2", "3", "4":
+				idx := int(msg.String()[0] - '1')
+				if idx < len(schemes) {
+					m.schemeIdx = idx
+				}
+				m.schemeSelect = false
 				if m.pendingVsComputer {
 					m.pendingVsComputer = false
 					m.diffSelect = true
@@ -514,6 +542,19 @@ func (m model) View() string {
 		return sb.String()
 	}
 
+	if m.schemeSelect {
+		var sb strings.Builder
+		sb.WriteString("\n ")
+		sb.WriteString(titleStyle.Render("Chess"))
+		sb.WriteString("\n\n")
+		sb.WriteString("  Choose a board color scheme\n\n")
+		for i, s := range schemes {
+			sb.WriteString(fmt.Sprintf("  [%d]  %s\n", i+1, s.name))
+		}
+		sb.WriteString("\n  " + msgStyle.Render("Press 1, 2, 3, or 4") + "\n\n")
+		return sb.String()
+	}
+
 	if m.timeSelect {
 		var sb strings.Builder
 		sb.WriteString("\n ")
@@ -562,6 +603,12 @@ func (m model) View() string {
 		fileLabels = "    h  g  f  e  d  c  b  a\n"
 	}
 	sb.WriteString(fileLabels)
+
+	sc := schemes[m.schemeIdx]
+	sqLight     := lipgloss.NewStyle().Background(lipgloss.Color(sc.light)).Foreground(lipgloss.Color("#1a1a1a"))
+	sqDark      := lipgloss.NewStyle().Background(lipgloss.Color(sc.dark)).Foreground(lipgloss.Color("#1a1a1a"))
+	sqMoveLight := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveLight)).Foreground(lipgloss.Color("#1a1a1a"))
+	sqMoveDark  := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveDark)).Foreground(lipgloss.Color("#ffffff"))
 
 	board := m.game.Position().Board()
 
@@ -619,13 +666,24 @@ func (m model) View() string {
 			case isHint && !light:
 				style = hintDark
 			case isLastMove && light:
-				style = lastMoveLight
+				style = sqMoveLight
 			case isLastMove && !light:
-				style = lastMoveDark
+				style = sqMoveDark
 			case light:
-				style = lightSq
+				style = sqLight
 			default:
-				style = darkSq
+				style = sqDark
+			}
+
+			// Always render pieces in their own colour so white pieces aren't
+			// made dark by a light-square foreground, and black pieces aren't
+			// turned white by a last-move highlight's foreground.
+			if piece != chess.NoPiece {
+				if piece.Color() == chess.White {
+					style = style.Foreground(lipgloss.Color("#FFFFFF"))
+				} else {
+					style = style.Foreground(lipgloss.Color("#1a1a1a"))
+				}
 			}
 
 			sb.WriteString(style.Render(cell))
