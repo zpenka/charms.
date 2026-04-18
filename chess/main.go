@@ -66,7 +66,6 @@ func (m model) boardIsLight(row, col int) bool {
 		return (row+(7-col))%2 == 1
 	}
 	return ((7-row)+col)%2 == 1
->>>>>>> e8462a8 (feat: flip board with f key, auto-flip when playing Black)
 }
 
 func newModel() model {

@@ -49,8 +49,12 @@ func TestBoardFlip_AutoFlipWhenPlayingBlack(t *testing.T) {
 	m := newModel()
 	m.modeSelect = true
 
-	// Press 2 to go to vs computer
+	// Press 2 to go to vs computer (now lands on diffSelect)
 	updated, _ := m.Update(key("2"))
+	m = updated.(model)
+
+	// Press 2 to choose medium difficulty
+	updated, _ = m.Update(key("2"))
 	m = updated.(model)
 
 	// Press B to play as Black
