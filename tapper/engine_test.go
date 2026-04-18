@@ -205,7 +205,7 @@ func TestLoseLife_Decrements(t *testing.T) {
 }
 
 func TestLoseLife_ClearsMugsAndCustomers(t *testing.T) {
-	m := modelWith([]mug{{0, 5}}, []customer{{0, 10, false}})
+	m := modelWith([]mug{{0, 5}}, []customer{{lane: 0, x: 10}})
 	m = loseLife(m)
 	if len(m.mugs) != 0 || len(m.customers) != 0 {
 		t.Error("loseLife should clear mugs and customers when lives remain")
@@ -380,7 +380,7 @@ func TestTickGame_FlashDecrementsEachTick(t *testing.T) {
 // startWave
 
 func TestStartWave_ClearsBarAndResetsSpawns(t *testing.T) {
-	m := modelWith([]mug{{0, 5}}, []customer{{0, 10, false}})
+	m := modelWith([]mug{{0, 5}}, []customer{{lane: 0, x: 10}})
 	m.wave = 2
 	m = startWave(m)
 	if len(m.mugs) != 0 || len(m.customers) != 0 {
@@ -391,5 +391,100 @@ func TestStartWave_ClearsBarAndResetsSpawns(t *testing.T) {
 	}
 	if m.state != StatePlaying {
 		t.Error("startWave should set state to StatePlaying")
+	}
+}
+
+// multi-mug per lane
+
+func TestTap_AllowsSecondMugWhenFirstPastHalfway(t *testing.T) {
+	m := newGame()
+	m.bartender = 0
+	m.mugs = []mug{{lane: 0, x: BarWidth / 2}}
+	m = tap(m)
+	if len(m.mugs) != 2 {
+		t.Errorf("want 2 mugs when first is past halfway, got %d", len(m.mugs))
+	}
+}
+
+func TestTap_BlocksSecondMugWhenFirstBeforeHalfway(t *testing.T) {
+	m := newGame()
+	m.bartender = 0
+	m.mugs = []mug{{lane: 0, x: BarWidth/2 - 1}}
+	m = tap(m)
+	if len(m.mugs) != 1 {
+		t.Errorf("want 1 mug (blocked before halfway), got %d", len(m.mugs))
+	}
+}
+
+// serve animation
+
+func TestCheckCollisions_CreatesServeAnim(t *testing.T) {
+	m := modelWith(
+		[]mug{{lane: 0, x: 8}},
+		[]customer{{lane: 0, x: 8}},
+	)
+	m = checkCollisions(m)
+	if len(m.serveAnims) != 1 {
+		t.Fatalf("want 1 serveAnim, got %d", len(m.serveAnims))
+	}
+	if m.serveAnims[0].lane != 0 || m.serveAnims[0].x != 8 {
+		t.Errorf("serveAnim = %+v, want {lane:0 x:8}", m.serveAnims[0])
+	}
+	if m.serveAnims[0].frames <= 0 {
+		t.Error("serveAnim frames should be > 0")
+	}
+}
+
+func TestTickServeAnims_DecrementsFrames(t *testing.T) {
+	m := newGame()
+	m.serveAnims = []serveAnim{{lane: 0, x: 5, frames: 3}}
+	m = tickServeAnims(m)
+	if len(m.serveAnims) != 1 {
+		t.Fatalf("anim should still exist, got %d", len(m.serveAnims))
+	}
+	if m.serveAnims[0].frames != 2 {
+		t.Errorf("frames = %d, want 2", m.serveAnims[0].frames)
+	}
+}
+
+func TestTickServeAnims_RemovesExpiredAnims(t *testing.T) {
+	m := newGame()
+	m.serveAnims = []serveAnim{{lane: 0, x: 5, frames: 1}}
+	m = tickServeAnims(m)
+	if len(m.serveAnims) != 0 {
+		t.Errorf("expired anim should be removed, got %d", len(m.serveAnims))
+	}
+}
+
+// per-customer speed
+
+func TestSpawnCustomer_LaterSpawnsHaveFasterInterval(t *testing.T) {
+	m := newGame()
+	// spawn enough to trigger speedup (every 4 spawns)
+	for i := 0; i < 5; i++ {
+		m = spawnCustomer(m)
+		m.spawnsLeft--
+	}
+	first := m.customers[0].moveInterval
+	last := m.customers[len(m.customers)-1].moveInterval
+	if last >= first {
+		t.Errorf("later customer interval %d should be less than first %d", last, first)
+	}
+}
+
+func TestAdvanceCustomers_RespectsPerCustomerInterval(t *testing.T) {
+	m := newGame()
+	m.tick = 5
+	// moveInterval=10: tick 5 → 5%10 != 0, should NOT move
+	m.customers = []customer{{lane: 0, x: 10, moveInterval: 10}}
+	m = advanceCustomers(m)
+	if m.customers[0].x != 10 {
+		t.Errorf("customer should not move when tick%%interval != 0, x = %d", m.customers[0].x)
+	}
+	// moveInterval=5: tick 5 → 5%5 == 0, SHOULD move
+	m.customers = []customer{{lane: 0, x: 10, moveInterval: 5}}
+	m = advanceCustomers(m)
+	if m.customers[0].x != 9 {
+		t.Errorf("customer should move when tick%%interval == 0, x = %d", m.customers[0].x)
 	}
 }

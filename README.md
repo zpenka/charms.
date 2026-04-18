@@ -88,4 +88,6 @@ A terminal take on the classic 1983 arcade game. Slide beer mugs down four bar l
 | `p` | Pause / unpause |
 | `q` | Quit to lobby |
 
-One mug per lane at a time. Customers walk faster each wave, and more of them spawn. Serve all customers in a wave to advance. Customers tint green → yellow → red as they approach the bar. The HUD shows how many customers remain (queued + on-screen). Losing a life triggers a brief red flash that freezes the action.
+One mug per lane at a time — but once the first mug passes halfway, you can fire a second on the same lane. Customers tint green → yellow → red as they approach the bar. A `*` flashes at the delivery point on each successful serve. Later customers within a wave spawn progressively faster, ratcheting up pressure as the wave goes on. The HUD shows how many customers remain (queued + on-screen). Losing a life triggers a brief red flash that freezes the action.
+
+After game over, scores are saved to `~/.local/share/charms/tapper_scores.json` and a leaderboard shows your top 5 all-time scores with the current run highlighted.

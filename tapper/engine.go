@@ -12,19 +12,24 @@ const (
 	StatePlaying   gameState = iota
 	StateWaveClear
 	StateGameOver
+	StateLeaderboard
 )
 
 type mug struct{ lane, x int }
 
 type customer struct {
-	lane, x    int
-	retreating bool
+	lane, x      int
+	retreating   bool
+	moveInterval int
 }
+
+type serveAnim struct{ lane, x, frames int }
 
 type model struct {
 	bartender   int
 	mugs        []mug
 	customers   []customer
+	serveAnims  []serveAnim
 	score       int
 	lives       int
 	wave        int
@@ -35,16 +40,24 @@ type model struct {
 	nextLane    int
 	paused      bool
 	flashFrames int
+	scores      []ScoreEntry
+	scorePath   string
 }
 
 func newGame() model {
-	m := model{lives: MaxLives}
+	path := defaultScorePath()
+	return newGameWithScores(loadScores(path), path)
+}
+
+func newGameWithScores(scores []ScoreEntry, path string) model {
+	m := model{lives: MaxLives, scores: scores, scorePath: path}
 	return startWave(m)
 }
 
 func startWave(m model) model {
 	m.mugs = nil
 	m.customers = nil
+	m.serveAnims = nil
 	m.tick = 0
 	m.spawnsLeft = spawnsForWave(m.wave)
 	m.spawnTimer = spawnInterval(m.wave)
@@ -82,9 +95,11 @@ func customerMoveInterval(wave int) int {
 	return 3
 }
 
+// tap fires a mug on the bartender's lane. A second mug is allowed if the
+// first has already passed the halfway point.
 func tap(m model) model {
 	for _, mg := range m.mugs {
-		if mg.lane == m.bartender {
+		if mg.lane == m.bartender && mg.x < BarWidth/2 {
 			return m
 		}
 	}
@@ -109,9 +124,15 @@ func advanceMugs(m model) model {
 	return m
 }
 
+// advanceCustomers moves each customer according to its own moveInterval.
+// moveInterval==0 means always move (used by direct-construction test fixtures).
 func advanceCustomers(m model) model {
 	var keep []customer
 	for _, c := range m.customers {
+		if c.moveInterval > 0 && m.tick%c.moveInterval != 0 {
+			keep = append(keep, c)
+			continue
+		}
 		if c.retreating {
 			c.x++
 			if c.x < BarWidth {
@@ -151,6 +172,7 @@ func checkCollisions(m model) model {
 			if !c.retreating && mg.lane == c.lane && mg.x == c.x {
 				c.retreating = true
 				m.score++
+				m.serveAnims = append(m.serveAnims, serveAnim{lane: mg.lane, x: mg.x, frames: 3})
 				hit = true
 				break
 			}
@@ -163,10 +185,32 @@ func checkCollisions(m model) model {
 	return m
 }
 
+func tickServeAnims(m model) model {
+	var keep []serveAnim
+	for _, a := range m.serveAnims {
+		a.frames--
+		if a.frames > 0 {
+			keep = append(keep, a)
+		}
+	}
+	m.serveAnims = keep
+	return m
+}
+
+// spawnCustomer spawns the next customer, assigning a faster moveInterval to
+// later spawns within the wave (every 4 spawns, the interval drops by 1).
 func spawnCustomer(m model) model {
 	lane := m.nextLane % Lanes
 	m.nextLane++
-	m.customers = append(m.customers, customer{lane: lane, x: BarWidth - 1})
+	spawnIdx := spawnsForWave(m.wave) - m.spawnsLeft
+	interval := customerMoveInterval(m.wave)
+	if bonus := spawnIdx / 4; bonus > 0 {
+		interval -= bonus
+		if interval < 2 {
+			interval = 2
+		}
+	}
+	m.customers = append(m.customers, customer{lane: lane, x: BarWidth - 1, moveInterval: interval})
 	return m
 }
 
@@ -201,14 +245,15 @@ func tickGame(m model) model {
 		m = checkCollisions(m)
 	}
 
-	if m.tick%customerMoveInterval(m.wave) == 0 {
-		m = advanceCustomers(m)
-		m = checkBreaches(m)
-		if m.state != StatePlaying {
-			return m
-		}
-		m = checkCollisions(m)
+	// Per-customer intervals: advance every tick; each customer decides itself.
+	m = advanceCustomers(m)
+	m = checkBreaches(m)
+	if m.state != StatePlaying {
+		return m
 	}
+	m = checkCollisions(m)
+
+	m = tickServeAnims(m)
 
 	m.spawnTimer--
 	if m.spawnTimer <= 0 && m.spawnsLeft > 0 {
