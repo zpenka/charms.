@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charms/chess"
+	"charms/snake"
 	"charms/tapper"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,16 +18,36 @@ var (
 	lobbySubtitle = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
 	lobbyActive   = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true)
 	lobbyInactive = lipgloss.NewStyle().Foreground(lipgloss.Color("#DDDDDD"))
+	lobbyDesc     = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	lobbyScore    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
 )
 
 type game struct {
-	name string
-	run  func()
+	name     string
+	desc     string
+	run      func()
+	topScore func() string
 }
 
 var games = []game{
-	{"Chess", chess.Run},
-	{"Tapper", tapper.Run},
+	{
+		name:     "Chess",
+		desc:     "two-player or vs computer, full clocks",
+		run:      chess.Run,
+		topScore: func() string { return "—" },
+	},
+	{
+		name:     "Tapper",
+		desc:     "serve beer before customers reach the bar",
+		run:      tapper.Run,
+		topScore: tapper.TopScore,
+	},
+	{
+		name:     "Snake",
+		desc:     "eat, grow, don't bite yourself",
+		run:      snake.Run,
+		topScore: snake.TopScore,
+	},
 }
 
 type lobbyModel struct {
@@ -57,9 +78,8 @@ func (m lobbyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.chosen = m.cursor
 			return m, tea.Quit
 		default:
-			// number shortcut: "1" selects game 0, etc.
 			if len(km.String()) == 1 && km.String() >= "1" && km.String() <= "9" {
-				idx := int(km.String()[0]-'1')
+				idx := int(km.String()[0] - '1')
 				if idx < len(games) {
 					m.chosen = idx
 					return m, tea.Quit
@@ -79,18 +99,27 @@ func (m lobbyModel) View() string {
 	sb.WriteString("\n\n")
 
 	for i, g := range games {
-		if i == m.cursor {
-			sb.WriteString(fmt.Sprintf("  %s [%d]  %s\n",
+		score := g.topScore()
+		active := i == m.cursor
+		if active {
+			sb.WriteString(fmt.Sprintf("  %s [%d]  %-8s  %s",
 				lobbyActive.Render("►"),
 				i+1,
 				lobbyActive.Render(g.name),
+				lobbyDesc.Render(g.desc),
 			))
 		} else {
-			sb.WriteString(fmt.Sprintf("    [%d]  %s\n",
+			sb.WriteString(fmt.Sprintf("     [%d]  %-8s  %s",
 				i+1,
 				lobbyInactive.Render(g.name),
+				lobbyDesc.Render(g.desc),
 			))
 		}
+		if score != "—" {
+			sb.WriteString("  ")
+			sb.WriteString(lobbyScore.Render("Best: " + score))
+		}
+		sb.WriteString("\n")
 	}
 
 	sb.WriteString("\n ")

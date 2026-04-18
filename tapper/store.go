@@ -2,6 +2,7 @@ package tapper
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,6 +48,15 @@ func saveScores(path string, entries []ScoreEntry) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
+}
+
+// TopScore returns the all-time best tapper score as a display string.
+func TopScore() string {
+	entries := loadScores(defaultScorePath())
+	if len(entries) == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%d", entries[0].Score)
 }
 
 func addScore(entries []ScoreEntry, score, wave int) []ScoreEntry {
