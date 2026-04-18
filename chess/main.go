@@ -83,11 +83,13 @@ type model struct {
 	flipped       bool
 	hintFrom      *chess.Square
 	hintTo        *chess.Square
-	hinting       bool
-	resigned      bool
-	whiteTime     time.Duration
-	blackTime     time.Duration
-	clockOn       bool
+	hinting            bool
+	resigned           bool
+	timeSelect         bool
+	pendingVsComputer  bool
+	whiteTime          time.Duration
+	blackTime          time.Duration
+	clockOn            bool
 }
 
 func (m model) boardSquare(row, col int) chess.Square {
@@ -190,10 +192,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "1":
 				m.modeSelect = false
-				m.message = "White's turn"
+				m.timeSelect = true
 			case "2":
 				m.modeSelect = false
-				m.diffSelect = true
+				m.timeSelect = true
+				m.pendingVsComputer = true
+			}
+			return m, nil
+		}
+
+		if m.timeSelect {
+			times := map[string]time.Duration{
+				"1": 1 * time.Minute,
+				"2": 5 * time.Minute,
+				"3": 10 * time.Minute,
+				"4": 30 * time.Minute,
+			}
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "1", "2", "3", "4":
+				d := times[msg.String()]
+				m.whiteTime = d
+				m.blackTime = d
+				m.timeSelect = false
+				if m.pendingVsComputer {
+					m.pendingVsComputer = false
+					m.diffSelect = true
+				} else {
+					m.message = "White's turn"
+				}
 			}
 			return m, nil
 		}
@@ -483,6 +511,20 @@ func (m model) View() string {
 		sb.WriteString("  [1]  Two player\n")
 		sb.WriteString("  [2]  vs Computer\n\n")
 		sb.WriteString("  " + msgStyle.Render("Press 1 or 2") + "\n\n")
+		return sb.String()
+	}
+
+	if m.timeSelect {
+		var sb strings.Builder
+		sb.WriteString("\n ")
+		sb.WriteString(titleStyle.Render("Chess"))
+		sb.WriteString("\n\n")
+		sb.WriteString("  Select time control\n\n")
+		sb.WriteString("  [1]  Bullet    (1 min)\n")
+		sb.WriteString("  [2]  Blitz     (5 min)\n")
+		sb.WriteString("  [3]  Rapid     (10 min)\n")
+		sb.WriteString("  [4]  Classical (30 min)\n\n")
+		sb.WriteString("  " + msgStyle.Render("Press 1, 2, 3, or 4") + "\n\n")
 		return sb.String()
 	}
 

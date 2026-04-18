@@ -659,8 +659,9 @@ func TestModeSelect_PressOneStartsTwoPlayer(t *testing.T) {
 	if got.vsComputer {
 		t.Error("vsComputer should be false in two-player mode")
 	}
-	if got.message != "White's turn" {
-		t.Errorf("message = %q, want \"White's turn\"", got.message)
+	// time-select screen is shown before game starts
+	if !got.timeSelect {
+		t.Error("pressing 1 should go to timeSelect before starting game")
 	}
 }
 
@@ -674,14 +675,18 @@ func TestModeSelect_PressTwoGoesToDiffSelect(t *testing.T) {
 	if got.modeSelect {
 		t.Error("modeSelect should be false after pressing 2")
 	}
-	if !got.diffSelect {
-		t.Error("diffSelect should be true after pressing 2")
+	// time-select comes before difficulty selection
+	if !got.timeSelect {
+		t.Error("pressing 2 should go to timeSelect before diffSelect")
+	}
+	if got.diffSelect {
+		t.Error("diffSelect should not be true yet — time select comes first")
 	}
 	if got.colorSelect {
-		t.Error("colorSelect should not be true yet — must choose difficulty first")
+		t.Error("colorSelect should not be true yet")
 	}
 	if got.vsComputer {
-		t.Error("vsComputer should not be set yet during difficulty selection")
+		t.Error("vsComputer should not be set yet")
 	}
 }
 
