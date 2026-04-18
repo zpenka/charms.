@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -33,6 +34,23 @@ var glyphs = map[chess.PieceType][2]string{
 
 type computerMoveMsg struct{ move *chess.Move }
 
+type tickMsg time.Time
+
+func tick() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+func formatClock(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	m := int(d.Minutes())
+	s := int(d.Seconds()) % 60
+	return fmt.Sprintf("%d:%02d", m, s)
+}
+
 type model struct {
 	game          *chess.Game
 	cursor        [2]int
@@ -52,6 +70,9 @@ type model struct {
 	promotionFrom chess.Square
 	promotionTo   chess.Square
 	flipped       bool
+	whiteTime     time.Duration
+	blackTime     time.Duration
+	clockOn       bool
 }
 
 func (m model) boardSquare(row, col int) chess.Square {
@@ -74,6 +95,8 @@ func newModel() model {
 		cursor:     [2]int{7, 4},
 		validDests: make(map[chess.Square]bool),
 		message:    "White's turn",
+		whiteTime:  10 * time.Minute,
+		blackTime:  10 * time.Minute,
 	}
 }
 
@@ -101,7 +124,7 @@ func isPromotionMove(g *chess.Game, from, to chess.Square) bool {
 	return false
 }
 
-func (m model) Init() tea.Cmd { return nil }
+func (m model) Init() tea.Cmd { return tick() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmsg, ok := msg.(computerMoveMsg); ok {
@@ -110,6 +133,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.thinking = false
 		return m, nil
+	}
+
+	if _, ok := msg.(tickMsg); ok {
+		if m.clockOn && m.game.Outcome() == chess.NoOutcome && !m.thinking && !m.modeSelect && !m.colorSelect {
+			if m.game.Position().Turn() == chess.White {
+				m.whiteTime -= time.Second
+				if m.whiteTime <= 0 {
+					m.whiteTime = 0
+					m.message = "White loses on time!"
+					return m, nil
+				}
+			} else {
+				m.blackTime -= time.Second
+				if m.blackTime <= 0 {
+					m.blackTime = 0
+					m.message = "Black loses on time!"
+					return m, nil
+				}
+			}
+		}
+		return m, tick()
 	}
 
 	switch msg := msg.(type) {
@@ -314,6 +358,7 @@ func (m *model) executeMove(from, to chess.Square) {
 		return
 	}
 	m.game.Move(chosen)
+	m.clockOn = true
 
 	f := chosen.S1()
 	m.lastFrom = &f
@@ -478,6 +523,8 @@ func (m model) View() string {
 
 	sb.WriteString(fileLabels + "\n")
 	sb.WriteString(" " + msgStyle.Render(m.message) + "\n\n")
+	sb.WriteString(fmt.Sprintf("  White: %s   Black: %s\n\n",
+		formatClock(m.whiteTime), formatClock(m.blackTime)))
 
 	if m.promoting {
 		sb.WriteString("  [Q]ueen  [R]ook  [B]ishop  [N]knight\n\n")
