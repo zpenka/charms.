@@ -85,6 +85,7 @@ A terminal take on the classic 1983 arcade game. Slide beer mugs down four bar l
 |-----|--------|
 | `↑↓` / `jk` | Move bartender between lanes |
 | `Space` / `Enter` | Tap (fire a mug) |
+| `p` | Pause / unpause |
 | `q` | Quit to lobby |
 
-One mug per lane at a time. Customers walk faster each wave, and more of them spawn. Serve all customers in a wave to advance.
+One mug per lane at a time. Customers walk faster each wave, and more of them spawn. Serve all customers in a wave to advance. Customers tint green → yellow → red as they approach the bar. The HUD shows how many customers remain (queued + on-screen). Losing a life triggers a brief red flash that freezes the action.
