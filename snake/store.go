@@ -1,4 +1,4 @@
-package tapper
+package snake
 
 import (
 	"encoding/json"
@@ -10,7 +10,6 @@ import (
 
 type ScoreEntry struct {
 	Score int `json:"score"`
-	Wave  int `json:"wave"`
 }
 
 func defaultScorePath() string {
@@ -18,7 +17,7 @@ func defaultScorePath() string {
 	if err != nil {
 		dir = "."
 	}
-	return filepath.Join(dir, ".local", "share", "charms", "tapper_scores.json")
+	return filepath.Join(dir, ".local", "share", "charms", "snake_scores.json")
 }
 
 func loadScores(path string) []ScoreEntry {
@@ -50,17 +49,8 @@ func saveScores(path string, entries []ScoreEntry) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// TopScore returns the all-time best tapper score as a display string.
-func TopScore() string {
-	entries := loadScores(defaultScorePath())
-	if len(entries) == 0 {
-		return "—"
-	}
-	return fmt.Sprintf("%d", entries[0].Score)
-}
-
-func addScore(entries []ScoreEntry, score, wave int) []ScoreEntry {
-	entries = append(entries, ScoreEntry{Score: score, Wave: wave})
+func addScore(entries []ScoreEntry, score int) []ScoreEntry {
+	entries = append(entries, ScoreEntry{Score: score})
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Score > entries[j].Score
 	})
@@ -68,4 +58,17 @@ func addScore(entries []ScoreEntry, score, wave int) []ScoreEntry {
 		entries = entries[:5]
 	}
 	return entries
+}
+
+func topScoreFromPath(path string) string {
+	entries := loadScores(path)
+	if len(entries) == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%d", entries[0].Score)
+}
+
+// TopScore returns the all-time best snake length as a display string.
+func TopScore() string {
+	return topScoreFromPath(defaultScorePath())
 }

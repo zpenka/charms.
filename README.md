@@ -8,7 +8,7 @@ A collection of [Charm](https://charm.sh) TUI experiments built with [Bubble Tea
 go run .
 ```
 
-A lobby appears where you can pick which game to play. Press `q` or `Ctrl+C` to quit.
+A lobby appears showing all available games with a short description and your all-time best score for each. Press `q` or `Ctrl+C` to quit.
 
 ## Testing
 
@@ -99,3 +99,18 @@ One mug per lane at a time — but once the first mug passes halfway, you can fi
 **Wave summary:** after each wave the clear screen shows your serve accuracy, best combo, and a wave bonus (combo×3, +20 for a perfect clear) added to your score.
 
 After game over, scores are saved to `~/.local/share/charms/tapper_scores.json` and a leaderboard shows your top 5 all-time scores with the current run highlighted.
+
+---
+
+### Snake
+
+The classic game. Eat food (`*`) to grow your snake. Don't hit the walls or your own tail.
+
+**Controls:**
+
+| Key | Action |
+|-----|--------|
+| `↑↓←→` / `wasd` | Steer |
+| `q` | Quit to lobby |
+
+Speed increases as you grow. After game over, your length is saved to `~/.local/share/charms/snake_scores.json` and a leaderboard shows your top 5 runs.
