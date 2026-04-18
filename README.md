@@ -37,4 +37,6 @@ Then choose your colour (`W` for White or `B` for Black).
 | `Esc` | Cancel selection |
 | `q` | Quit |
 
-Valid move destinations are highlighted on the board. After every move, the from- and to-squares of the last move are tinted in amber. Move history is shown in algebraic notation below the board. The computer opponent uses a minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Search depth is determined by the selected difficulty level (2–4 ply). Pawns auto-promote to queens.
+Valid move destinations are highlighted on the board. After every move, the from- and to-squares are tinted in amber. Move history is shown in algebraic notation below the board. The computer opponent uses a minimax engine with alpha-beta pruning, piece-square positional tables, and capture-first move ordering. Search depth is determined by the selected difficulty level (2–4 ply).
+
+**Pawn promotion:** when you move a pawn to the back rank, a picker appears — press `Q`, `R`, `B`, or `N` to choose. The computer always promotes to a queen automatically.
