@@ -173,7 +173,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.promoting && m.vsComputer && m.game.Position().Turn() == m.computerColor && m.game.Outcome() == chess.NoOutcome {
 				m.thinking = true
 				m.message = "Computer is thinking..."
-				return m, computeMove(m.game)
+				return m, computeMove(m.game, depthForDifficulty(m.difficulty))
 			}
 			return m, nil
 		}
