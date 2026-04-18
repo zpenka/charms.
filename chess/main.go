@@ -83,6 +83,7 @@ type model struct {
 	hintFrom      *chess.Square
 	hintTo        *chess.Square
 	hinting       bool
+	resigned      bool
 	whiteTime     time.Duration
 	blackTime     time.Duration
 	clockOn       bool
@@ -292,6 +293,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hintTo = nil
 			m.hinting = true
 			return m, computeHint(m.game, 2)
+		case "r":
+			if !m.resigned && m.game.Outcome() == chess.NoOutcome {
+				m.resigned = true
+				if m.game.Position().Turn() == chess.White {
+					m.message = "White resigns — Black wins!  (q to quit)"
+				} else {
+					m.message = "Black resigns — White wins!  (q to quit)"
+				}
+			}
 		case "enter", " ":
 			return m.handleSelect()
 		case "esc":
@@ -304,7 +314,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleSelect() (tea.Model, tea.Cmd) {
-	if m.game.Outcome() != chess.NoOutcome {
+	if m.game.Outcome() != chess.NoOutcome || m.resigned {
 		return m, nil
 	}
 
@@ -583,7 +593,7 @@ func (m model) View() string {
 	sb.WriteString(" ↑↓←→ / hjkl  move cursor\n")
 	sb.WriteString(" Enter / Space  select / move\n")
 	sb.WriteString(" Esc  cancel selection   q  quit\n")
-	sb.WriteString(" f  flip board   ?  hint\n\n")
+	sb.WriteString(" f  flip board   ?  hint   r  resign\n\n")
 
 	return sb.String()
 }
