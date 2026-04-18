@@ -51,6 +51,21 @@ type model struct {
 	promoting     bool
 	promotionFrom chess.Square
 	promotionTo   chess.Square
+	flipped       bool
+}
+
+func (m model) boardSquare(row, col int) chess.Square {
+	if m.flipped {
+		return chess.Square(row*8 + (7 - col))
+	}
+	return chess.Square((7-row)*8 + col)
+}
+
+func (m model) boardIsLight(row, col int) bool {
+	if m.flipped {
+		return (row+(7-col))%2 == 1
+	}
+	return ((7-row)+col)%2 == 1
 }
 
 func newModel() model {
@@ -146,6 +161,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.colorSelect = false
 				m.vsComputer = true
 				m.computerColor = chess.White
+				m.flipped = true
 				m.thinking = true
 				m.message = "Computer is thinking..."
 				return m, computeMove(m.game, depthForDifficulty(m.difficulty))
@@ -201,6 +217,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor[1] < 7 {
 				m.cursor[1]++
 			}
+		case "f":
+			m.flipped = !m.flipped
 		case "enter", " ":
 			return m.handleSelect()
 		case "esc":
@@ -217,7 +235,7 @@ func (m model) handleSelect() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	sq := toSquare(m.cursor[0], m.cursor[1])
+	sq := m.boardSquare(m.cursor[0], m.cursor[1])
 	piece := m.game.Position().Board().Piece(sq)
 	turn := m.game.Position().Turn()
 
@@ -234,7 +252,7 @@ func (m model) handleSelect() (tea.Model, tea.Cmd) {
 	}
 
 	// Re-select own piece
-	if piece != chess.NoPiece && piece.Color() == turn && sq != toSquare((*m.selected)[0], (*m.selected)[1]) {
+	if piece != chess.NoPiece && piece.Color() == turn && sq != m.boardSquare((*m.selected)[0], (*m.selected)[1]) {
 		sel := m.cursor
 		m.selected = &sel
 		m.validDests = validDestsFor(m.game, sq)
@@ -249,7 +267,7 @@ func (m model) handleSelect() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	fromSq := toSquare((*m.selected)[0], (*m.selected)[1])
+	fromSq := m.boardSquare((*m.selected)[0], (*m.selected)[1])
 
 	if isPromotionMove(m.game, fromSq, sq) {
 		m.promoting = true
@@ -390,18 +408,27 @@ func (m model) View() string {
 	sb.WriteString("\n ")
 	sb.WriteString(titleStyle.Render("Chess"))
 	sb.WriteString("\n\n")
-	sb.WriteString("    a  b  c  d  e  f  g  h\n")
+	fileLabels := "    a  b  c  d  e  f  g  h\n"
+	if m.flipped {
+		fileLabels = "    h  g  f  e  d  c  b  a\n"
+	}
+	sb.WriteString(fileLabels)
 
 	board := m.game.Position().Board()
 
 	for row := 0; row < 8; row++ {
-		rank := 7 - row
+		var rank int
+		if m.flipped {
+			rank = row
+		} else {
+			rank = 7 - row
+		}
 		sb.WriteString(fmt.Sprintf("  %d ", rank+1))
 
 		for col := 0; col < 8; col++ {
-			sq := chess.Square(rank*8 + col)
+			sq := m.boardSquare(row, col)
 			piece := board.Piece(sq)
-			light := isLight(row, col)
+			light := m.boardIsLight(row, col)
 
 			isCursor := m.cursor[0] == row && m.cursor[1] == col
 			isSelected := m.selected != nil && (*m.selected)[0] == row && (*m.selected)[1] == col
@@ -449,7 +476,7 @@ func (m model) View() string {
 		sb.WriteString(fmt.Sprintf(" %d\n", rank+1))
 	}
 
-	sb.WriteString("    a  b  c  d  e  f  g  h\n\n")
+	sb.WriteString(fileLabels + "\n")
 	sb.WriteString(" " + msgStyle.Render(m.message) + "\n\n")
 
 	if m.promoting {
@@ -469,7 +496,8 @@ func (m model) View() string {
 
 	sb.WriteString(" ↑↓←→ / hjkl  move cursor\n")
 	sb.WriteString(" Enter / Space  select / move\n")
-	sb.WriteString(" Esc  cancel selection   q  quit\n\n")
+	sb.WriteString(" Esc  cancel selection   q  quit\n")
+	sb.WriteString(" f  flip board\n\n")
 
 	return sb.String()
 }
