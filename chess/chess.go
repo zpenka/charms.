@@ -675,6 +675,17 @@ func (m model) View() string {
 				style = sqDark
 			}
 
+			// Always render pieces in their own colour so white pieces aren't
+			// made dark by a light-square foreground, and black pieces aren't
+			// turned white by a last-move highlight's foreground.
+			if piece != chess.NoPiece {
+				if piece.Color() == chess.White {
+					style = style.Foreground(lipgloss.Color("#FFFFFF"))
+				} else {
+					style = style.Foreground(lipgloss.Color("#1a1a1a"))
+				}
+			}
+
 			sb.WriteString(style.Render(cell))
 		}
 
