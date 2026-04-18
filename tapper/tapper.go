@@ -10,15 +10,19 @@ import (
 )
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF6B6B"))
-	livesStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B"))
-	scoreStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
-	barStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	mugStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
-	customerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF9F43")).Bold(true)
-	bartenderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
-	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
-	alertStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
+	titleStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF6B6B"))
+	livesStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B"))
+	scoreStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
+	barStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	mugStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
+	custSafeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ECC71")).Bold(true)
+	custWarnStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#F39C12")).Bold(true)
+	custDangerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#E74C3C")).Bold(true)
+	bartenderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
+	msgStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+	alertStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
+	flashStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#E74C3C")).Bold(true)
+	pauseStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
 )
 
 type tickMsg struct{}
@@ -39,18 +43,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "p":
+			if m.state == StatePlaying {
+				m.paused = !m.paused
+			}
 		case "up", "k":
-			if m.state == StatePlaying && m.bartender > 0 {
+			if m.state == StatePlaying && !m.paused && m.bartender > 0 {
 				m.bartender--
 			}
 		case "down", "j":
-			if m.state == StatePlaying && m.bartender < Lanes-1 {
+			if m.state == StatePlaying && !m.paused && m.bartender < Lanes-1 {
 				m.bartender++
 			}
 		case " ", "enter":
 			switch m.state {
 			case StatePlaying:
-				return tap(m), nil
+				if !m.paused {
+					return tap(m), nil
+				}
 			case StateWaveClear:
 				m.wave++
 				return startWave(m), nil
@@ -73,7 +83,14 @@ func (m model) View() string {
 	sb.WriteString(scoreStyle.Render(fmt.Sprintf("Score: %d", m.score)))
 	sb.WriteString("  ")
 	sb.WriteString(msgStyle.Render(fmt.Sprintf("Wave: %d", m.wave+1)))
+	sb.WriteString("  ")
+	sb.WriteString(msgStyle.Render(fmt.Sprintf("▸ %d remaining", m.spawnsLeft+len(m.customers))))
 	sb.WriteString("\n\n")
+
+	if m.paused {
+		sb.WriteString(pauseStyle.Render(" ── PAUSED ──"))
+		sb.WriteString("\n\n")
+	}
 
 	// Build lookup maps for fast rendering
 	mugAt := make(map[[2]int]bool)
@@ -94,11 +111,23 @@ func (m model) View() string {
 		sb.WriteString(barStyle.Render("│"))
 
 		for x := 0; x < BarWidth; x++ {
+			key := [2]int{lane, x}
 			switch {
-			case mugAt[[2]int{lane, x}]:
+			case m.flashFrames > 0:
+				sb.WriteString(flashStyle.Render("×"))
+			case mugAt[key]:
 				sb.WriteString(mugStyle.Render("o"))
-			case custAt[[2]int{lane, x}]:
-				sb.WriteString(customerStyle.Render("@"))
+			case custAt[key]:
+				var cs lipgloss.Style
+				switch {
+				case x >= BarWidth*2/3:
+					cs = custSafeStyle
+				case x >= BarWidth/3:
+					cs = custWarnStyle
+				default:
+					cs = custDangerStyle
+				}
+				sb.WriteString(cs.Render("@"))
 			default:
 				sb.WriteString(barStyle.Render("·"))
 			}
@@ -122,7 +151,11 @@ func (m model) View() string {
 		sb.WriteString(msgStyle.Render("Press Space to play again  q to quit"))
 		sb.WriteString("\n\n")
 	default:
-		sb.WriteString(msgStyle.Render(" ↑↓ / jk  move   Space  tap   q  quit"))
+		if m.paused {
+			sb.WriteString(msgStyle.Render(" p  unpause   q  quit"))
+		} else {
+			sb.WriteString(msgStyle.Render(" ↑↓ / jk  move   Space  tap   p  pause   q  quit"))
+		}
 		sb.WriteString("\n\n")
 	}
 

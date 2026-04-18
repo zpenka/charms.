@@ -326,6 +326,59 @@ func TestNewGame_InitialState(t *testing.T) {
 	}
 }
 
+// pause
+
+func TestTickGame_NoopWhenPaused(t *testing.T) {
+	m := newGame()
+	m.paused = true
+	before := m.tick
+	m = tickGame(m)
+	if m.tick != before {
+		t.Error("tickGame should not advance while paused")
+	}
+}
+
+// flash
+
+func TestLoseLife_SetsFlashFrames(t *testing.T) {
+	m := newGame()
+	m.lives = 2
+	m = loseLife(m)
+	if m.flashFrames == 0 {
+		t.Error("loseLife should set flashFrames > 0 when lives remain")
+	}
+}
+
+func TestLoseLife_NoFlashOnGameOver(t *testing.T) {
+	m := newGame()
+	m.lives = 1
+	m = loseLife(m)
+	if m.state != StateGameOver {
+		t.Error("should be game over")
+	}
+}
+
+func TestTickGame_FlashPausesEngine(t *testing.T) {
+	m := newGame()
+	m.flashFrames = 3
+	before := m.tick
+	m = tickGame(m)
+	if m.tick != before {
+		t.Error("tick should not advance while flashing")
+	}
+}
+
+func TestTickGame_FlashDecrementsEachTick(t *testing.T) {
+	m := newGame()
+	m.flashFrames = 3
+	m = tickGame(m)
+	if m.flashFrames != 2 {
+		t.Errorf("flashFrames = %d, want 2", m.flashFrames)
+	}
+}
+
+// startWave
+
 func TestStartWave_ClearsBarAndResetsSpawns(t *testing.T) {
 	m := modelWith([]mug{{0, 5}}, []customer{{0, 10, false}})
 	m.wave = 2

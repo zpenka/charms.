@@ -22,17 +22,19 @@ type customer struct {
 }
 
 type model struct {
-	bartender  int
-	mugs       []mug
-	customers  []customer
-	score      int
-	lives      int
-	wave       int
-	tick       int
-	state      gameState
-	spawnsLeft int
-	spawnTimer int
-	nextLane   int
+	bartender   int
+	mugs        []mug
+	customers   []customer
+	score       int
+	lives       int
+	wave        int
+	tick        int
+	state       gameState
+	spawnsLeft  int
+	spawnTimer  int
+	nextLane    int
+	paused      bool
+	flashFrames int
 }
 
 func newGame() model {
@@ -177,11 +179,16 @@ func loseLife(m model) model {
 	m.mugs = nil
 	m.customers = nil
 	m.spawnTimer = spawnInterval(m.wave)
+	m.flashFrames = 4
 	return m
 }
 
 func tickGame(m model) model {
-	if m.state != StatePlaying {
+	if m.paused || m.state != StatePlaying {
+		return m
+	}
+	if m.flashFrames > 0 {
+		m.flashFrames--
 		return m
 	}
 	m.tick++
