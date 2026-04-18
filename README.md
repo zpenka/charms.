@@ -10,6 +10,20 @@ go run .
 
 A lobby appears where you can pick which game to play. Press `q` or `Ctrl+C` to quit.
 
+## Testing
+
+Run all tests across every game:
+
+```
+go test ./...
+```
+
+Run tests for a specific game:
+
+```
+go test ./chess/...
+```
+
 ## Games
 
 ### Chess
