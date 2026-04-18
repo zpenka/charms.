@@ -114,3 +114,19 @@ The classic game. Eat food (`*`) to grow your snake. Don't hit the walls or your
 | `q` | Quit to lobby |
 
 Speed increases as you grow. After game over, your length is saved to `~/.local/share/charms/snake_scores.json` and a leaderboard shows your top 5 runs.
+
+---
+
+### 2048
+
+Slide all tiles in one direction with each keypress. Tiles with equal values merge into their sum. Reach a 2048 tile to win — or keep going for a higher score.
+
+**Controls:**
+
+| Key | Action |
+|-----|--------|
+| `↑↓←→` / `wasd` | Slide tiles |
+| `Space` | Continue after winning / confirm on end screens |
+| `q` | Quit to lobby |
+
+Each merge adds to your score (e.g. merging two 512s scores 1024). After game over, scores are saved to `~/.local/share/charms/2048_scores.json` and a leaderboard shows your top 5 runs.
