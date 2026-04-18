@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charms/chess"
+	"charms/tapper"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -25,6 +26,7 @@ type game struct {
 
 var games = []game{
 	{"Chess", chess.Run},
+	{"Tapper", tapper.Run},
 }
 
 type lobbyModel struct {
