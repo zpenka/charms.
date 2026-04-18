@@ -1,4 +1,4 @@
-package main
+package chess
 
 import (
 	"fmt"
@@ -665,7 +665,7 @@ func (m model) View() string {
 	return sb.String()
 }
 
-func main() {
+func Run() {
 	m := newModel()
 	m.modeSelect = true
 	m.message = ""

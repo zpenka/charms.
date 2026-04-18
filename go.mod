@@ -1,4 +1,4 @@
-module chess
+module charms
 
 go 1.21
 
