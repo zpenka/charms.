@@ -23,6 +23,7 @@ var (
 	alertStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
 	flashStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#E74C3C")).Bold(true)
 	pauseStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
+	serveStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 )
 
 type tickMsg struct{}
@@ -65,7 +66,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.wave++
 				return startWave(m), nil
 			case StateGameOver:
-				return newGame(), nil
+				entries := addScore(loadScores(m.scorePath), m.score, m.wave+1)
+				saveScores(m.scorePath, entries)
+				m.scores = entries
+				m.state = StateLeaderboard
+				return m, nil
+			case StateLeaderboard:
+				return newGameWithScores(m.scores, m.scorePath), nil
 			}
 		}
 	}
@@ -101,6 +108,10 @@ func (m model) View() string {
 	for _, c := range m.customers {
 		custAt[[2]int{c.lane, c.x}] = true
 	}
+	serveAt := make(map[[2]int]bool)
+	for _, a := range m.serveAnims {
+		serveAt[[2]int{a.lane, a.x}] = true
+	}
 
 	for lane := 0; lane < Lanes; lane++ {
 		if m.bartender == lane {
@@ -115,6 +126,8 @@ func (m model) View() string {
 			switch {
 			case m.flashFrames > 0:
 				sb.WriteString(flashStyle.Render("×"))
+			case serveAt[key]:
+				sb.WriteString(serveStyle.Render("*"))
 			case mugAt[key]:
 				sb.WriteString(mugStyle.Render("o"))
 			case custAt[key]:
@@ -148,7 +161,26 @@ func (m model) View() string {
 	case StateGameOver:
 		sb.WriteString(livesStyle.Render(fmt.Sprintf(" Game over!  Final score: %d", m.score)))
 		sb.WriteString("\n ")
-		sb.WriteString(msgStyle.Render("Press Space to play again  q to quit"))
+		sb.WriteString(msgStyle.Render("Press Space for leaderboard  q to quit"))
+		sb.WriteString("\n\n")
+	case StateLeaderboard:
+		sb.WriteString(alertStyle.Render(" Top Scores"))
+		sb.WriteString("\n\n")
+		if len(m.scores) == 0 {
+			sb.WriteString(msgStyle.Render(" No scores yet."))
+			sb.WriteString("\n")
+		}
+		for i, e := range m.scores {
+			line := fmt.Sprintf(" %d.  %6d pts  wave %d", i+1, e.Score, e.Wave)
+			if e.Score == m.score && e.Wave == m.wave+1 {
+				sb.WriteString(alertStyle.Render(line))
+			} else {
+				sb.WriteString(msgStyle.Render(line))
+			}
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n ")
+		sb.WriteString(msgStyle.Render("Space to play again  q to quit"))
 		sb.WriteString("\n\n")
 	default:
 		if m.paused {
