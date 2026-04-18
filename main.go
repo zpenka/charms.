@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -13,6 +14,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+// version is set at build time by GoReleaser via -ldflags "-X main.version=..."
+var version = "dev"
 
 var (
 	lobbyTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
@@ -136,6 +140,13 @@ func (m lobbyModel) View() string {
 }
 
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+	if *showVersion {
+		fmt.Println("charms " + version)
+		return
+	}
+
 	for {
 		p := tea.NewProgram(newLobbyModel(), tea.WithAltScreen())
 		result, err := p.Run()

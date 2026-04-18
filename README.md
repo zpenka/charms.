@@ -1,11 +1,34 @@
 # charms.
 
-A collection of [Charm](https://charm.sh) TUI experiments built with [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+A collection of [Charm](https://charm.sh) TUI games built with [Bubble Tea](https://github.com/charmbracelet/bubbletea): Chess, Tapper, Snake, and 2048.
+
+## Install
+
+### Homebrew (macOS / Linux)
+
+```
+brew tap zpenka/tap
+brew install charms
+```
+
+### Download a binary
+
+Grab a pre-built binary from the [latest GitHub release](https://github.com/zpenka/charms./releases/latest), extract it, and put `charms` somewhere on your `$PATH`.
+
+### Build from source
+
+```
+git clone https://github.com/zpenka/charms.
+cd charms.
+go build -o charms .
+```
+
+Requires Go 1.21+.
 
 ## Running
 
 ```
-go run .
+charms
 ```
 
 A lobby appears showing all available games with a short description and your all-time best score for each. Press `q` or `Ctrl+C` to quit.
