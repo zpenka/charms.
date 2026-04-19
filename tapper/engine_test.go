@@ -460,15 +460,17 @@ func TestTickServeAnims_RemovesExpiredAnims(t *testing.T) {
 
 func TestSpawnCustomer_LaterSpawnsHaveFasterInterval(t *testing.T) {
 	m := newGame()
-	// spawn enough to trigger speedup (every 4 spawns)
+	// 5 spawns → 5th customer has spawnIdx=4, bonus=1, reducing base interval by 1.
+	// At wave 0 only KindNormal and KindThirsty can spawn; both end up with an
+	// interval strictly less than the base (Thirsty halves it further).
 	for i := 0; i < 5; i++ {
 		m = spawnCustomer(m)
 		m.spawnsLeft--
 	}
-	first := m.customers[0].moveInterval
+	base := customerMoveInterval(m.wave)
 	last := m.customers[len(m.customers)-1].moveInterval
-	if last >= first {
-		t.Errorf("later customer interval %d should be less than first %d", last, first)
+	if last >= base {
+		t.Errorf("later customer interval %d should be < base %d after spawn speedup", last, base)
 	}
 }
 
