@@ -68,6 +68,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return applyMove(m, DirUp), nil
 		case "down", "s":
 			return applyMove(m, DirDown), nil
+		case "z":
+			return undoMove(m), nil
 		case " ", "enter":
 			switch m.state {
 			case StateWon:
@@ -95,6 +97,8 @@ func (m model) View() string {
 	sb.WriteString(titleStyle.Render("2048"))
 	sb.WriteString("  ")
 	sb.WriteString(scoreStyle.Render(fmt.Sprintf("Score: %d", m.score)))
+	sb.WriteString("  ")
+	sb.WriteString(scoreStyle.Render(fmt.Sprintf("Best tile: %d", maxTile(m.board))))
 	sb.WriteString("\n\n")
 
 	// Top border
@@ -158,7 +162,7 @@ func (m model) View() string {
 		sb.WriteString(msgStyle.Render("Space to play again  q to quit"))
 		sb.WriteString("\n\n")
 	default:
-		sb.WriteString(msgStyle.Render(" ↑↓←→ / wasd  move   q  quit"))
+		sb.WriteString(msgStyle.Render(" ↑↓←→ / wasd  move   z  undo   q  quit"))
 		sb.WriteString("\n\n")
 	}
 

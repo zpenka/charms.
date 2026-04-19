@@ -12,7 +12,8 @@ const (
 type gameState int
 
 const (
-	StatePlaying   gameState = iota
+	StateModeSelect gameState = iota
+	StatePlaying
 	StateWaveClear
 	StateGameOver
 	StateLeaderboard
@@ -38,27 +39,28 @@ type customer struct {
 type serveAnim struct{ lane, x, frames int }
 
 type model struct {
-	bartender      int
-	mugs           []mug
-	customers      []customer
-	serveAnims     []serveAnim
-	score          int
-	lives          int
-	wave           int
-	tick           int
-	state          gameState
-	spawnsLeft     int
-	spawnTimer     int
-	nextLane       int
-	paused         bool
-	flashFrames    int
-	combo          int
+	bartender        int
+	mugs             []mug
+	customers        []customer
+	serveAnims       []serveAnim
+	score            int
+	lives            int
+	wave             int
+	tick             int
+	state            gameState
+	spawnsLeft       int
+	spawnTimer       int
+	nextLane         int
+	paused           bool
+	flashFrames      int
+	combo            int
 	waveLongestCombo int
-	waveServes     int
-	waveBonus      int
-	nextLifeAt     int
-	scores         []ScoreEntry
-	scorePath      string
+	waveServes       int
+	waveBonus        int
+	nextLifeAt       int
+	endless          bool
+	scores           []ScoreEntry
+	scorePath        string
 }
 
 func newGame() model {
@@ -354,8 +356,13 @@ func tickGame(m model) model {
 		}
 		m.waveBonus = calcWaveBonus(m.waveServes, total, m.waveLongestCombo)
 		m.score += m.waveBonus
-		m.state = StateWaveClear
 		m.mugs = nil
+		if m.endless {
+			m.wave++
+			m = startWave(m)
+		} else {
+			m.state = StateWaveClear
+		}
 	}
 
 	return m

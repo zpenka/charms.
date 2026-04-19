@@ -98,12 +98,12 @@ func TestUpdate_GameOverSpaceGoesToLeaderboard(t *testing.T) {
 	}
 }
 
-func TestUpdate_LeaderboardSpaceStartsNewGame(t *testing.T) {
+func TestUpdate_LeaderboardSpaceGoesToModeSelect(t *testing.T) {
 	m := newGame()
 	m.state = StateLeaderboard
 	updated, _ := m.Update(key(" "))
-	if updated.(model).state != StatePlaying {
-		t.Errorf("state = %v, want StatePlaying", updated.(model).state)
+	if updated.(model).state != StateModeSelect {
+		t.Errorf("state = %v, want StateModeSelect", updated.(model).state)
 	}
 }
 
@@ -190,5 +190,45 @@ func TestView_WaveClearShowsBonus(t *testing.T) {
 	m.waveBonus = 35
 	if !strings.Contains(m.View(), "35") {
 		t.Error("wave clear view should show wave bonus")
+	}
+}
+
+// ── endless mode UI ───────────────────────────────────────────────────────────
+
+func TestView_ModeSelectShowsOptions(t *testing.T) {
+	m := newGame()
+	m.state = StateModeSelect
+	view := m.View()
+	if !strings.Contains(view, "Waves") {
+		t.Error("mode select should show 'Waves' option")
+	}
+	if !strings.Contains(view, "Endless") {
+		t.Error("mode select should show 'Endless' option")
+	}
+}
+
+func TestUpdate_ModeSelect1ChoosesWaves(t *testing.T) {
+	m := newGame()
+	m.state = StateModeSelect
+	updated, _ := m.Update(key("1"))
+	got := updated.(model)
+	if got.state == StateModeSelect {
+		t.Error("pressing 1 in mode select should leave StateModeSelect")
+	}
+	if got.endless {
+		t.Error("pressing 1 should choose waves (endless=false)")
+	}
+}
+
+func TestUpdate_ModeSelect2ChoosesEndless(t *testing.T) {
+	m := newGame()
+	m.state = StateModeSelect
+	updated, _ := m.Update(key("2"))
+	got := updated.(model)
+	if got.state == StateModeSelect {
+		t.Error("pressing 2 in mode select should leave StateModeSelect")
+	}
+	if !got.endless {
+		t.Error("pressing 2 should choose endless mode")
 	}
 }

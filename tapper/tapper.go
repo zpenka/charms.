@@ -44,6 +44,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		return tickGame(m), doTick()
 	case tea.KeyMsg:
+		if m.state == StateModeSelect {
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "1":
+				m.endless = false
+				return startWave(m), nil
+			case "2":
+				m.endless = true
+				return startWave(m), nil
+			}
+			return m, nil
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -75,7 +88,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = StateLeaderboard
 				return m, nil
 			case StateLeaderboard:
-				return newGameWithScores(m.scores, m.scorePath), nil
+				ng := newGameWithScores(m.scores, m.scorePath)
+				ng.state = StateModeSelect
+				return ng, nil
 			}
 		}
 	}
@@ -84,6 +99,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	var sb strings.Builder
+
+	if m.state == StateModeSelect {
+		sb.WriteString("\n ")
+		sb.WriteString(titleStyle.Render("Tapper"))
+		sb.WriteString("\n\n")
+		sb.WriteString("  Choose a mode:\n\n")
+		sb.WriteString("  [1]  Waves    (8 waves, then done)\n")
+		sb.WriteString("  [2]  Endless  (keep going forever)\n\n")
+		sb.WriteString("  " + msgStyle.Render("Press 1 or 2") + "\n\n")
+		return sb.String()
+	}
 
 	sb.WriteString("\n ")
 	sb.WriteString(titleStyle.Render("Tapper"))

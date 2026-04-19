@@ -406,6 +406,99 @@ func TestApplyMove_BlockedWhenGameOver(t *testing.T) {
 	}
 }
 
+// ── maxTile ───────────────────────────────────────────────────────────────────
+
+func TestMaxTile_ReturnsLargestValue(t *testing.T) {
+	b := boardWith([BoardSize][BoardSize]int{
+		{2, 4, 8, 16},
+		{32, 64, 128, 256},
+		{2, 4, 8, 16},
+		{32, 64, 128, 256},
+	})
+	if got := maxTile(b); got != 256 {
+		t.Errorf("maxTile = %d, want 256", got)
+	}
+}
+
+func TestMaxTile_EmptyBoardIsZero(t *testing.T) {
+	var b board
+	if got := maxTile(b); got != 0 {
+		t.Errorf("maxTile = %d, want 0 for empty board", got)
+	}
+}
+
+// ── undoMove ──────────────────────────────────────────────────────────────────
+
+func TestApplyMove_SetsHasPrev(t *testing.T) {
+	m := newGame()
+	m.board = boardWith([BoardSize][BoardSize]int{
+		{0, 0, 0, 2},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	})
+	m = applyMove(m, DirLeft)
+	if !m.hasPrev {
+		t.Error("hasPrev should be true after a valid move")
+	}
+}
+
+func TestUndoMove_RestoresPreviousBoard(t *testing.T) {
+	m := newGame()
+	m.board = boardWith([BoardSize][BoardSize]int{
+		{0, 0, 0, 2},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	})
+	prev := m.board
+	m = applyMove(m, DirLeft)
+	m = undoMove(m)
+	if m.board != prev {
+		t.Error("undoMove should restore the board to before the last move")
+	}
+}
+
+func TestUndoMove_RestoresPreviousScore(t *testing.T) {
+	m := newGame()
+	m.board = boardWith([BoardSize][BoardSize]int{
+		{2, 2, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	})
+	m.score = 100
+	m = applyMove(m, DirLeft)
+	m = undoMove(m)
+	if m.score != 100 {
+		t.Errorf("score = %d, want 100 after undo", m.score)
+	}
+}
+
+func TestUndoMove_ClearsHasPrev(t *testing.T) {
+	m := newGame()
+	m.board = boardWith([BoardSize][BoardSize]int{
+		{0, 0, 0, 2},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	})
+	m = applyMove(m, DirLeft)
+	m = undoMove(m)
+	if m.hasPrev {
+		t.Error("hasPrev should be false after undoing — only one undo allowed")
+	}
+}
+
+func TestUndoMove_NopWhenNoPrev(t *testing.T) {
+	m := newGame()
+	before := m.board
+	m = undoMove(m)
+	if m.board != before {
+		t.Error("undoMove should be noop when no previous state exists")
+	}
+}
+
 func TestApplyMove_WonStateContinues(t *testing.T) {
 	m := newGame()
 	m.state = StateWon

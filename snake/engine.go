@@ -31,6 +31,7 @@ type model struct {
 	dir       dir
 	nextDir   dir
 	food      pos
+	obstacles []pos
 	score     int
 	tick      int
 	state     gameState
@@ -54,7 +55,28 @@ func newGameWithScores(scores []ScoreEntry, path string) model {
 		scores:    scores,
 		scorePath: path,
 	}
+	m = placeObstacles(m)
 	return placeFood(m)
+}
+
+func placeObstacles(m model) model {
+	// Build a set of positions occupied by the starting snake
+	occupied := make(map[pos]bool, len(m.snake))
+	for _, p := range m.snake {
+		occupied[p] = true
+	}
+	// Scatter ~10% of cells as obstacle tiles, avoiding the snake start area
+	count := (Width * Height) / 10
+	var obs []pos
+	for len(obs) < count {
+		p := pos{rand.Intn(Width), rand.Intn(Height)}
+		if !occupied[p] {
+			obs = append(obs, p)
+			occupied[p] = true
+		}
+	}
+	m.obstacles = obs
+	return m
 }
 
 func moveEvery(score int) int {
@@ -88,8 +110,11 @@ func changeDir(m model, d dir) model {
 }
 
 func placeFood(m model) model {
-	occupied := make(map[pos]bool, len(m.snake))
+	occupied := make(map[pos]bool, len(m.snake)+len(m.obstacles))
 	for _, p := range m.snake {
+		occupied[p] = true
+	}
+	for _, p := range m.obstacles {
 		occupied[p] = true
 	}
 	for {
@@ -115,10 +140,16 @@ func moveSnake(m model) model {
 		next = pos{head.x, head.y + 1}
 	}
 
-	// wall collision
-	if next.x < 0 || next.x >= Width || next.y < 0 || next.y >= Height {
-		m.state = StateGameOver
-		return m
+	// portal walls: wrap around edges
+	next.x = (next.x + Width) % Width
+	next.y = (next.y + Height) % Height
+
+	// obstacle collision
+	for _, p := range m.obstacles {
+		if p == next {
+			m.state = StateGameOver
+			return m
+		}
 	}
 
 	// self collision

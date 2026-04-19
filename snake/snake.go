@@ -10,14 +10,15 @@ import (
 )
 
 var (
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	scoreStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
-	headStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
-	bodyStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ECC71"))
-	foodStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")).Bold(true)
-	borderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
-	msgStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
-	alertStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
+	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	scoreStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
+	headStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
+	bodyStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ECC71"))
+	foodStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")).Bold(true)
+	obstacleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	borderStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+	alertStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
 )
 
 type tickMsg struct{}
@@ -79,6 +80,10 @@ func (m model) View() string {
 	for _, p := range m.snake[1:] {
 		bodySet[p] = true
 	}
+	obsSet := make(map[pos]bool, len(m.obstacles))
+	for _, p := range m.obstacles {
+		obsSet[p] = true
+	}
 
 	// Top border
 	sb.WriteString(" ")
@@ -97,6 +102,8 @@ func (m model) View() string {
 				sb.WriteString(bodyStyle.Render("o"))
 			case p == m.food:
 				sb.WriteString(foodStyle.Render("*"))
+			case obsSet[p]:
+				sb.WriteString(obstacleStyle.Render("█"))
 			default:
 				sb.WriteString(" ")
 			}

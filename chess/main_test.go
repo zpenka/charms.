@@ -551,6 +551,66 @@ func TestHandleSelect_GameOverNoOp(t *testing.T) {
 	}
 }
 
+// ── capturedPieces ────────────────────────────────────────────────────────────
+
+func TestCapturedPieces_InitialBoardEmpty(t *testing.T) {
+	g := chess.NewGame()
+	byWhite, byBlack := capturedPieces(g)
+	if len(byWhite) != 0 {
+		t.Errorf("byWhite = %v, want empty at start", byWhite)
+	}
+	if len(byBlack) != 0 {
+		t.Errorf("byBlack = %v, want empty at start", byBlack)
+	}
+}
+
+func TestCapturedPieces_AfterCapture(t *testing.T) {
+	// Fool's mate captures nothing, so use a position where white captures a pawn.
+	// 1.e4 d5 2.exd5 — white captures black's d5 pawn.
+	g := chess.NewGame()
+	playMoves(g, [][2]chess.Square{
+		{chess.E2, chess.E4},
+		{chess.D7, chess.D5},
+		{chess.E4, chess.D5},
+	})
+	byWhite, byBlack := capturedPieces(g)
+	if len(byWhite) != 1 {
+		t.Errorf("byWhite len = %d, want 1 after white captures pawn", len(byWhite))
+	}
+	if len(byBlack) != 0 {
+		t.Errorf("byBlack len = %d, want 0", len(byBlack))
+	}
+}
+
+func TestView_ShowsCapturedSection(t *testing.T) {
+	// After a capture, view should show a "Captured" label.
+	g := chess.NewGame()
+	playMoves(g, [][2]chess.Square{
+		{chess.E2, chess.E4},
+		{chess.D7, chess.D5},
+		{chess.E4, chess.D5},
+	})
+	m := model{game: g, validDests: make(map[chess.Square]bool)}
+	view := m.View()
+	if !strings.Contains(view, "Captured") {
+		t.Error("view should show 'Captured' section when pieces have been taken")
+	}
+}
+
+func TestView_ShowsPGNOnGameOver(t *testing.T) {
+	g := foolsMate()
+	m := model{
+		game:       g,
+		validDests: make(map[chess.Square]bool),
+		message:    "Checkmate! Black wins!  (q to quit)",
+	}
+	view := m.View()
+	// PGN should contain at least the first move number
+	if !strings.Contains(view, "1.") {
+		t.Error("view should show PGN notation after game over")
+	}
+}
+
 func TestHandleSelect_EnterThenEscThenMove(t *testing.T) {
 	m := newModel()
 	// Select e2
