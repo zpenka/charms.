@@ -331,3 +331,146 @@ func TestTickGame_AppliesBufferedDir(t *testing.T) {
 		t.Errorf("dir = %v, want DirUp after buffered change applied", m.dir)
 	}
 }
+
+// ── bonus food ───────────────────────────────────────────────────────────────
+
+func TestMoveSnake_EatsBonusFoodGivesThreePoints(t *testing.T) {
+	m := newGame()
+	m.obstacles = nil
+	m.bonusFoodActive = true
+	m.bonusFood = pos{m.snake[0].x + 1, m.snake[0].y}
+	m.food = pos{0, 0}
+	m = moveSnake(m)
+	if m.score != 3 {
+		t.Errorf("score = %d, want 3 for eating bonus food", m.score)
+	}
+}
+
+func TestMoveSnake_EatsBonusFoodDeactivatesIt(t *testing.T) {
+	m := newGame()
+	m.obstacles = nil
+	m.bonusFoodActive = true
+	m.bonusFood = pos{m.snake[0].x + 1, m.snake[0].y}
+	m.food = pos{0, 0}
+	m = moveSnake(m)
+	if m.bonusFoodActive {
+		t.Error("bonusFoodActive should be false after eating bonus food")
+	}
+}
+
+func TestMoveSnake_EatsBonusFoodActivatesGhost(t *testing.T) {
+	m := newGame()
+	m.obstacles = nil
+	m.bonusFoodActive = true
+	m.bonusFood = pos{m.snake[0].x + 1, m.snake[0].y}
+	m.food = pos{0, 0}
+	m = moveSnake(m)
+	if m.ghostTicks <= 0 {
+		t.Error("eating bonus food should activate ghost mode (ghostTicks > 0)")
+	}
+}
+
+func TestTickGame_BonusFood_ExpiresAfterDuration(t *testing.T) {
+	m := newGame()
+	m.obstacles = nil
+	m.bonusFoodActive = true
+	m.bonusFoodTicks = 1
+	m.bonusFood = pos{0, 19} // far away from snake
+	m.food = pos{1, 0}
+	m = tickGame(m)
+	if m.bonusFoodActive {
+		t.Error("bonus food should expire when bonusFoodTicks reaches 0")
+	}
+}
+
+func TestTickGame_BonusFood_SpawnsOccasionally(t *testing.T) {
+	// Drive the game for many ticks; bonus food should appear at some point
+	m := newGame()
+	m.obstacles = nil
+	appeared := false
+	for i := 0; i < 200 && !appeared; i++ {
+		m = tickGame(m)
+		if m.bonusFoodActive {
+			appeared = true
+		}
+	}
+	if !appeared {
+		t.Error("bonus food should appear within 200 ticks")
+	}
+}
+
+// ── ghost mode ───────────────────────────────────────────────────────────────
+
+func TestMoveSnake_GhostIgnoresObstacles(t *testing.T) {
+	m := newGame()
+	m.snake = []pos{{5, 5}}
+	m.dir = DirRight
+	m.food = pos{0, 0}
+	m.obstacles = []pos{{6, 5}}
+	m.ghostTicks = 5
+	m = moveSnake(m)
+	if m.state == StateGameOver {
+		t.Error("ghost mode should allow passing through obstacles")
+	}
+	if m.snake[0] != (pos{6, 5}) {
+		t.Errorf("ghost should move through obstacle to %v, got %v", pos{6, 5}, m.snake[0])
+	}
+}
+
+func TestMoveSnake_GhostDecrementsEachMove(t *testing.T) {
+	m := newGame()
+	m.obstacles = nil
+	m.ghostTicks = 5
+	m.food = pos{0, 0}
+	m = moveSnake(m)
+	if m.ghostTicks != 4 {
+		t.Errorf("ghostTicks = %d, want 4 after one move", m.ghostTicks)
+	}
+}
+
+func TestMoveSnake_GhostExpires(t *testing.T) {
+	m := newGame()
+	m.snake = []pos{{5, 5}}
+	m.dir = DirRight
+	m.food = pos{0, 0}
+	m.obstacles = []pos{{6, 5}}
+	m.ghostTicks = 0 // ghost not active
+	m = moveSnake(m)
+	if m.state != StateGameOver {
+		t.Error("should get game over hitting obstacle when ghost is not active")
+	}
+}
+
+// ── growing obstacles ─────────────────────────────────────────────────────────
+
+func TestGrowingObstacles_ObstacleAddedEveryFiveFood(t *testing.T) {
+	m := newGame()
+	m.obstacles = nil
+	m.food = pos{m.snake[0].x + 1, m.snake[0].y}
+	// Eat exactly 5 food items
+	for i := 0; i < 5; i++ {
+		m.food = pos{m.snake[0].x + 1, m.snake[0].y}
+		m = moveSnake(m)
+	}
+	if len(m.obstacles) == 0 {
+		t.Error("obstacles should grow after eating every 5 food items")
+	}
+}
+
+func TestGrowingObstacles_NotOnSnakeOrFood(t *testing.T) {
+	m := newGame()
+	m.obstacles = nil
+	for i := 0; i < 5; i++ {
+		m.food = pos{m.snake[0].x + 1, m.snake[0].y}
+		m = moveSnake(m)
+	}
+	snakeSet := make(map[pos]bool)
+	for _, p := range m.snake {
+		snakeSet[p] = true
+	}
+	for _, o := range m.obstacles {
+		if snakeSet[o] || o == m.food {
+			t.Errorf("new obstacle %v overlaps snake or food", o)
+		}
+	}
+}

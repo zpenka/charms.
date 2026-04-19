@@ -359,6 +359,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.message = "Black resigns — White wins!  (q to quit)"
 				}
 			}
+		case "t":
+			m.takeback()
 		case "enter", " ":
 			return m.handleSelect()
 		case "esc":
@@ -693,7 +695,19 @@ func (m model) View() string {
 	}
 
 	sb.WriteString(fileLabels + "\n")
-	sb.WriteString(" " + msgStyle.Render(m.message) + "\n\n")
+	// message + material score on same line
+	matStr := ""
+	if ms := materialScore(m.game); ms > 0 {
+		matStr = fmt.Sprintf("  +%d", ms)
+	} else if ms < 0 {
+		matStr = fmt.Sprintf("  %d", ms)
+	}
+	sb.WriteString(" " + msgStyle.Render(m.message+matStr) + "\n")
+	// opening name
+	if op := openingName(m.game); op != "" {
+		sb.WriteString(" " + msgStyle.Render("Opening: "+op) + "\n")
+	}
+	sb.WriteString("\n")
 	if m.hinting {
 		sb.WriteString(" " + msgStyle.Render("Finding hint...") + "\n\n")
 	}
@@ -741,7 +755,7 @@ func (m model) View() string {
 	sb.WriteString(" ↑↓←→ / hjkl  move cursor\n")
 	sb.WriteString(" Enter / Space  select / move\n")
 	sb.WriteString(" Esc  cancel selection   q  quit\n")
-	sb.WriteString(" f  flip board   ?  hint   r  resign\n\n")
+	sb.WriteString(" f  flip board   ?  hint   r  resign   t  takeback\n\n")
 
 	return sb.String()
 }

@@ -138,6 +138,83 @@ func TestUpdate_LeaderboardSpaceStartsNewGame(t *testing.T) {
 	}
 }
 
+// ── target tile selector ──────────────────────────────────────────────────────
+
+func TestView_TargetSelectShowsOptions(t *testing.T) {
+	m := newGame()
+	m.state = StateTargetSelect
+	view := m.View()
+	if !strings.Contains(view, "512") {
+		t.Error("target select view should show 512 option")
+	}
+	if !strings.Contains(view, "4096") {
+		t.Error("target select view should show 4096 option")
+	}
+}
+
+func TestUpdate_TargetSelect1Chooses512(t *testing.T) {
+	m := newGame()
+	m.state = StateTargetSelect
+	updated, _ := m.Update(press("1"))
+	got := updated.(model)
+	if got.targetTile != 512 {
+		t.Errorf("targetTile = %d, want 512", got.targetTile)
+	}
+	if got.state != StatePlaying {
+		t.Errorf("state = %v, want StatePlaying after choosing target", got.state)
+	}
+}
+
+func TestUpdate_TargetSelect2Chooses1024(t *testing.T) {
+	m := newGame()
+	m.state = StateTargetSelect
+	updated, _ := m.Update(press("2"))
+	got := updated.(model)
+	if got.targetTile != 1024 {
+		t.Errorf("targetTile = %d, want 1024", got.targetTile)
+	}
+}
+
+func TestUpdate_TargetSelect3Chooses2048(t *testing.T) {
+	m := newGame()
+	m.state = StateTargetSelect
+	updated, _ := m.Update(press("3"))
+	got := updated.(model)
+	if got.targetTile != 2048 {
+		t.Errorf("targetTile = %d, want 2048", got.targetTile)
+	}
+}
+
+func TestUpdate_TargetSelect4Chooses4096(t *testing.T) {
+	m := newGame()
+	m.state = StateTargetSelect
+	updated, _ := m.Update(press("4"))
+	got := updated.(model)
+	if got.targetTile != 4096 {
+		t.Errorf("targetTile = %d, want 4096", got.targetTile)
+	}
+}
+
+// ── all-time high score HUD ───────────────────────────────────────────────────
+
+func TestView_ShowsAllTimeHighScore(t *testing.T) {
+	m := newGame()
+	m.allTimeBest = 9876
+	view := m.View()
+	if !strings.Contains(view, "9876") {
+		t.Error("view should show all-time high score in HUD")
+	}
+}
+
+func TestView_AllTimeHighScoreLabel(t *testing.T) {
+	m := newGame()
+	m.allTimeBest = 100
+	view := m.View()
+	if !strings.Contains(view, "Best") {
+		t.Error("view should show 'Best' label for all-time high score")
+	}
+}
+
 func TestUpdate_ZKeyUndoes(t *testing.T) {
 	m := newGame()
 	m.board = board{}

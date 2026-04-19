@@ -57,6 +57,29 @@ func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if km, ok := msg.(tea.KeyMsg); ok {
+		if m.state == StateTargetSelect {
+			switch km.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "1":
+				m.targetTile = 512
+				m.state = StatePlaying
+				return m, nil
+			case "2":
+				m.targetTile = 1024
+				m.state = StatePlaying
+				return m, nil
+			case "3":
+				m.targetTile = 2048
+				m.state = StatePlaying
+				return m, nil
+			case "4":
+				m.targetTile = 4096
+				m.state = StatePlaying
+				return m, nil
+			}
+			return m, nil
+		}
 		switch km.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -99,6 +122,10 @@ func (m model) View() string {
 	sb.WriteString(scoreStyle.Render(fmt.Sprintf("Score: %d", m.score)))
 	sb.WriteString("  ")
 	sb.WriteString(scoreStyle.Render(fmt.Sprintf("Best tile: %d", maxTile(m.board))))
+	if m.allTimeBest > 0 {
+		sb.WriteString("  ")
+		sb.WriteString(msgStyle.Render(fmt.Sprintf("Best: %d", m.allTimeBest)))
+	}
 	sb.WriteString("\n\n")
 
 	// Top border
@@ -132,8 +159,17 @@ func (m model) View() string {
 	sb.WriteString("\n\n")
 
 	switch m.state {
+	case StateTargetSelect:
+		sb.WriteString(alertStyle.Render(" Choose your target tile:"))
+		sb.WriteString("\n\n")
+		sb.WriteString(msgStyle.Render("  [1]  512\n  [2]  1024\n  [3]  2048\n  [4]  4096"))
+		sb.WriteString("\n\n")
 	case StateWon:
-		sb.WriteString(alertStyle.Render(" You reached 2048!"))
+		goal := m.targetTile
+		if goal == 0 {
+			goal = 2048
+		}
+		sb.WriteString(alertStyle.Render(fmt.Sprintf(" You reached %d!", goal)))
 		sb.WriteString("\n ")
 		sb.WriteString(msgStyle.Render("Space to keep going  q to quit"))
 		sb.WriteString("\n\n")

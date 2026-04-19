@@ -717,3 +717,132 @@ func TestTickGame_EndlessAutoAdvancesWave(t *testing.T) {
 		t.Errorf("wave = %d, want 2 after auto-advance in endless mode", m.wave)
 	}
 }
+
+// ── slow-motion powerup ───────────────────────────────────────────────────────
+
+func TestKindSlowMo_HasNonZeroPoints(t *testing.T) {
+	if kindPoints(KindSlowMo) == 0 {
+		t.Error("KindSlowMo should be worth some points")
+	}
+}
+
+func TestCheckCollisions_SlowMoCustomerSetsSlowMoTicks(t *testing.T) {
+	m := newGame()
+	m.mugs = []mug{{lane: 0, x: 5}}
+	m.customers = []customer{{lane: 0, x: 5, kind: KindSlowMo}}
+	m = checkCollisions(m)
+	if m.slowMoTicks <= 0 {
+		t.Error("serving a SlowMo customer should set slowMoTicks > 0")
+	}
+}
+
+func TestTickGame_SlowMo_DecrementsSlowMoTicks(t *testing.T) {
+	m := newGame()
+	m.slowMoTicks = 10
+	m.spawnsLeft = 0
+	m.customers = nil
+	m.mugs = nil
+	m = tickGame(m)
+	if m.slowMoTicks >= 10 {
+		t.Error("tickGame should decrement slowMoTicks each tick")
+	}
+}
+
+func TestTickGame_SlowMo_HalvesCustomerSpeed(t *testing.T) {
+	// Without slow-mo: customer with moveInterval=0 moves every tick
+	// With slow-mo active: customer should only move every other tick
+	normal := newGame()
+	normal.mugs = nil
+	normal.spawnsLeft = 0
+	normal.customers = []customer{{lane: 0, x: 10, moveInterval: 0}}
+	xBefore := normal.customers[0].x
+	normal = tickGame(normal)
+	moved := normal.customers[0].x != xBefore
+
+	slow := newGame()
+	slow.slowMoTicks = 100
+	slow.mugs = nil
+	slow.spawnsLeft = 0
+	slow.customers = []customer{{lane: 0, x: 10, moveInterval: 0}}
+	slow = tickGame(slow)
+	movedSlow := slow.customers[0].x != slow.customers[0].x // always false; recalc
+
+	// Tick once more with slow-mo
+	xAfterFirst := slow.customers[0].x
+	slow = tickGame(slow)
+	movedSlow = slow.customers[0].x != xAfterFirst
+
+	if moved && movedSlow {
+		// That's a problem: slow-mo didn't slow the customer
+		// Actually let me restructure: tick twice with slow-mo, customer should move at most once
+	}
+	_ = moved
+	_ = movedSlow
+	// The real test: after N ticks with slow-mo, customer moves fewer times than without
+	m1 := newGame()
+	m1.mugs = nil
+	m1.spawnsLeft = 0
+	m1.customers = []customer{{lane: 0, x: BarWidth - 1, moveInterval: 0}}
+	m2 := newGame()
+	m2.slowMoTicks = 100
+	m2.mugs = nil
+	m2.spawnsLeft = 0
+	m2.customers = []customer{{lane: 0, x: BarWidth - 1, moveInterval: 0}}
+	for i := 0; i < 4; i++ {
+		m1 = tickGame(m1)
+		m2 = tickGame(m2)
+	}
+	if len(m1.customers) > 0 && len(m2.customers) > 0 {
+		if m2.customers[0].x <= m1.customers[0].x {
+			t.Error("slow-mo should result in customers advancing less (higher x value means less advanced)")
+		}
+	}
+}
+
+// ── double-tap bonus ─────────────────────────────────────────────────────────
+
+func TestCheckCollisions_DoubleTap_QuickServeSameLane(t *testing.T) {
+	m := newGame()
+	m.lastServeTickByLane = [Lanes]int{}
+	m.tick = 5
+	m.lastServeTickByLane[0] = 2 // last serve on lane 0 was tick 2 (within window)
+	m.combo = 1
+	m.mugs = []mug{{lane: 0, x: 5}}
+	m.customers = []customer{{lane: 0, x: 5, kind: KindNormal}}
+	prevScore := m.score
+	m = checkCollisions(m)
+	// Normal: kindPoints(KindNormal)*combo = 1*2 = 2 (combo incremented to 2 after first serve)
+	// But with double-tap on same lane, score should be doubled on top of combo
+	// Expected: 2 * 2 = 4 (double-tap doubles the points for that serve)
+	if m.score <= prevScore+2 {
+		t.Errorf("score gained = %d, want > 2 for double-tap bonus", m.score-prevScore)
+	}
+}
+
+func TestCheckCollisions_DoubleTap_NoBonusWhenFarApart(t *testing.T) {
+	m := newGame()
+	m.lastServeTickByLane = [Lanes]int{}
+	m.tick = 50
+	m.lastServeTickByLane[0] = 0 // last serve on lane 0 was tick 0 (too long ago)
+	m.combo = 1
+	m.mugs = []mug{{lane: 0, x: 5}}
+	m.customers = []customer{{lane: 0, x: 5, kind: KindNormal}}
+	prevScore := m.score
+	m = checkCollisions(m)
+	// No double-tap: normal combo score = kindPoints(KindNormal) * 2 (combo became 2) = 2
+	if m.score > prevScore+2 {
+		t.Errorf("no double-tap bonus expected when serves are far apart, got %d extra", m.score-prevScore)
+	}
+}
+
+func TestCheckCollisions_DoubleTap_UpdatesLastServeTick(t *testing.T) {
+	m := newGame()
+	m.lastServeTickByLane = [Lanes]int{}
+	m.tick = 7
+	m.mugs = []mug{{lane: 2, x: 5}}
+	m.customers = []customer{{lane: 2, x: 5, kind: KindNormal}}
+	m = checkCollisions(m)
+	if m.lastServeTickByLane[2] != 7 {
+		t.Errorf("lastServeTickByLane[2] = %d, want 7", m.lastServeTickByLane[2])
+	}
+}

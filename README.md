@@ -89,6 +89,7 @@ Then choose your colour (`W` for White or `B` for Black).
 | `Esc` | Cancel selection |
 | `f` | Flip board perspective |
 | `?` | Hint (highlight engine's suggested move) |
+| `t` | Takeback (undo last move; undoes two moves when playing vs Computer) |
 | `r` | Resign |
 | `q` | Quit to lobby |
 
@@ -97,6 +98,10 @@ Valid move destinations are highlighted on the board. After every move, the from
 **Pawn promotion:** when you move a pawn to the back rank, a picker appears — press `Q`, `R`, `B`, or `N` to choose. The computer always promotes to a queen automatically.
 
 **Captured pieces:** pieces taken by each side are listed below the clocks (e.g. `Captured by White: ♟ ♟`).
+
+**Material score:** when one side is ahead in material, the HUD shows the advantage (e.g. `+3` for a knight up). Nothing is shown when material is equal.
+
+**Opening name:** the HUD displays the detected opening name (e.g. "Italian Game", "Sicilian Defense") as long as the position matches a known opening line.
 
 **PGN:** when the game ends, full PGN notation is shown below the board so you can review or copy the game.
 
@@ -122,15 +127,17 @@ On launch, choose your mode:
 
 One mug per lane at a time — but once the first mug passes halfway, you can fire a second on the same lane. Customers tint green → yellow → red as they approach the bar. A `*` flashes at the delivery point on each successful serve. Later customers within a wave spawn progressively faster, ratcheting up pressure as the wave goes on. The HUD shows how many customers remain (queued + on-screen). Losing a life triggers a brief red flash that freezes the action.
 
-**Special customers:** `!` Thirsty customers move at double speed and are worth 2× points. `$` VIP customers move slowly but are worth 5× points.
+**Special customers:** `!` Thirsty customers move at double speed and are worth 2× points. `$` VIP customers move slowly but are worth 5× points. `~` Slow-Mo customers move at normal speed, are worth 3× points, and trigger a 100-tick slow-motion effect when served — all customers advance at half speed while `SLOW MO` is shown in the HUD.
 
 **Combo multiplier:** each consecutive serve without a miss increases your combo. Points scored = customer value × combo, so chaining serves across lanes pays off big. The active combo is shown in the HUD; it resets on any life lost.
+
+**Double-tap bonus:** serving the same lane twice within 10 ticks doubles the points for the second serve.
 
 **Extra life:** earn a heart back every 50 points, up to the 3-life maximum.
 
 **Wave summary:** after each wave the clear screen shows your serve accuracy, best combo, and a wave bonus (combo×3, +20 for a perfect clear) added to your score.
 
-After game over, scores are saved to `~/.local/share/charms/tapper_scores.json` and a leaderboard shows your top 5 all-time scores with the current run highlighted.
+After game over, scores are saved to `~/.local/share/charms/tapper_scores.json` and a leaderboard shows your top 5 all-time scores with the current run highlighted. The **best wave** reached across all runs is shown at the bottom of the leaderboard.
 
 ---
 
@@ -147,7 +154,9 @@ The classic game. Eat food (`*`) to grow your snake. Don't hit obstacles or your
 
 **Portal walls:** the edges of the board wrap around — exiting one side brings you out the other. No wall deaths.
 
-**Obstacles:** each game spawns a set of `█` tiles scattered around the board. Running into one ends the game.
+**Obstacles:** each game spawns a set of `█` tiles scattered around the board. Running into one ends the game. A new obstacle is added for every 5 food items eaten, so the board gets progressively more dangerous.
+
+**Bonus food:** a `$` tile appears every 30 ticks and expires after 40. Eating it scores 3 points and activates **Ghost mode** (`GHOST` shown in HUD) for 10 moves — in ghost mode the snake passes through obstacles without dying.
 
 Speed increases as you grow. After game over, your length is saved to `~/.local/share/charms/snake_scores.json` and a leaderboard shows your top 5 runs.
 
@@ -155,7 +164,14 @@ Speed increases as you grow. After game over, your length is saved to `~/.local/
 
 ### 2048
 
-Slide all tiles in one direction with each keypress. Tiles with equal values merge into their sum. Reach a 2048 tile to win — or keep going for a higher score.
+Slide all tiles in one direction with each keypress. Tiles with equal values merge into their sum. Reach your target tile to win — or keep going for a higher score.
+
+**Target tile:** on the game start screen, choose your win condition:
+
+- `1` — 512
+- `2` — 1024
+- `3` — 2048 (default)
+- `4` — 4096
 
 **Controls:**
 
@@ -166,4 +182,4 @@ Slide all tiles in one direction with each keypress. Tiles with equal values mer
 | `Space` | Continue after winning / confirm on end screens |
 | `q` | Quit to lobby |
 
-Each merge adds to your score (e.g. merging two 512s scores 1024). The HUD shows your current score and the highest tile on the board. After game over, scores are saved to `~/.local/share/charms/2048_scores.json` and a leaderboard shows your top 5 runs.
+Each merge adds to your score (e.g. merging two 512s scores 1024). **Bonus tiles** occasionally spawn on the board — merging a bonus tile doubles the points scored for that merge (the bonus marker is consumed). The HUD shows your current score, highest tile on the board, and your **all-time best score** across all sessions. After game over, scores are saved to `~/.local/share/charms/2048_scores.json` and a leaderboard shows your top 5 runs.

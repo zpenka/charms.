@@ -25,6 +25,12 @@ const (
 	KindNormal  customerKind = iota
 	KindThirsty              // moves faster, worth 2× points
 	KindVIP                  // moves slower, worth 5× points
+	KindSlowMo               // triggers slow-motion when served, worth 3× points
+)
+
+const (
+	SlowMoDuration    = 100 // ticks of slow-motion effect (~5 seconds)
+	DoubleTapWindow   = 10  // ticks between serves on the same lane for double-tap bonus
 )
 
 type mug struct{ lane, x int }
@@ -39,28 +45,30 @@ type customer struct {
 type serveAnim struct{ lane, x, frames int }
 
 type model struct {
-	bartender        int
-	mugs             []mug
-	customers        []customer
-	serveAnims       []serveAnim
-	score            int
-	lives            int
-	wave             int
-	tick             int
-	state            gameState
-	spawnsLeft       int
-	spawnTimer       int
-	nextLane         int
-	paused           bool
-	flashFrames      int
-	combo            int
-	waveLongestCombo int
-	waveServes       int
-	waveBonus        int
-	nextLifeAt       int
-	endless          bool
-	scores           []ScoreEntry
-	scorePath        string
+	bartender           int
+	mugs                []mug
+	customers           []customer
+	serveAnims          []serveAnim
+	score               int
+	lives               int
+	wave                int
+	tick                int
+	state               gameState
+	spawnsLeft          int
+	spawnTimer          int
+	nextLane            int
+	paused              bool
+	flashFrames         int
+	combo               int
+	waveLongestCombo    int
+	waveServes          int
+	waveBonus           int
+	nextLifeAt          int
+	endless             bool
+	slowMoTicks         int
+	lastServeTickByLane [Lanes]int
+	scores              []ScoreEntry
+	scorePath           string
 }
 
 func newGame() model {
@@ -129,6 +137,8 @@ func kindPoints(k customerKind) int {
 		return 2
 	case KindVIP:
 		return 5
+	case KindSlowMo:
+		return 3
 	default:
 		return 1
 	}
@@ -214,13 +224,24 @@ func checkCollisions(m model) model {
 				if m.combo > m.waveLongestCombo {
 					m.waveLongestCombo = m.combo
 				}
-				m.score += kindPoints(c.kind) * m.combo
+				pts := kindPoints(c.kind) * m.combo
+				// Double-tap bonus: quick consecutive serve on same lane
+				if m.tick-m.lastServeTickByLane[mg.lane] <= DoubleTapWindow &&
+					m.lastServeTickByLane[mg.lane] > 0 {
+					pts *= 2
+				}
+				m.lastServeTickByLane[mg.lane] = m.tick
+				m.score += pts
 				m.waveServes++
 				if m.score >= m.nextLifeAt {
 					if m.lives < MaxLives {
 						m.lives++
 					}
 					m.nextLifeAt += LifeThreshold
+				}
+				// Slow-mo powerup
+				if c.kind == KindSlowMo {
+					m.slowMoTicks = SlowMoDuration
 				}
 				m.serveAnims = append(m.serveAnims, serveAnim{lane: mg.lane, x: mg.x, frames: 3})
 				hit = true
@@ -252,6 +273,8 @@ func kindForWave(wave int) customerKind {
 	switch {
 	case wave >= 2 && r < 10:
 		return KindVIP
+	case wave >= 1 && r < 15:
+		return KindSlowMo
 	case r < 20:
 		return KindThirsty
 	default:
@@ -325,12 +348,21 @@ func tickGame(m model) model {
 	}
 	m.tick++
 
+	if m.slowMoTicks > 0 {
+		m.slowMoTicks--
+	}
+
 	if m.tick%mugMoveInterval(m.wave) == 0 {
 		m = advanceMugs(m)
 		if m.state != StatePlaying {
 			return m
 		}
 		m = checkCollisions(m)
+	}
+
+	// During slow-mo, customers only advance every other tick
+	if m.slowMoTicks > 0 && m.tick%2 != 0 {
+		return m
 	}
 
 	m = advanceCustomers(m)
