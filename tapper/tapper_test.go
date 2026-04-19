@@ -195,6 +195,48 @@ func TestView_WaveClearShowsBonus(t *testing.T) {
 
 // ── endless mode UI ───────────────────────────────────────────────────────────
 
+// ── slow-motion view ─────────────────────────────────────────────────────────
+
+func TestView_ShowsSlowMoIndicator(t *testing.T) {
+	m := newGame()
+	m.slowMoTicks = 50
+	view := m.View()
+	if !strings.Contains(view, "SLOW") {
+		t.Error("view should show SLOW MO indicator when slowMoTicks > 0")
+	}
+}
+
+func TestView_NoSlowMoWhenInactive(t *testing.T) {
+	m := newGame()
+	m.slowMoTicks = 0
+	view := m.View()
+	if strings.Contains(view, "SLOW") {
+		t.Error("view should not show slow-mo indicator when inactive")
+	}
+}
+
+// ── high-water mark ───────────────────────────────────────────────────────────
+
+func TestView_ShowsBestWaveOnLeaderboard(t *testing.T) {
+	m := newGame()
+	m.state = StateLeaderboard
+	m.scores = []ScoreEntry{{Score: 100, Wave: 5}, {Score: 50, Wave: 3}}
+	view := m.View()
+	if !strings.Contains(view, "Best wave") {
+		t.Error("leaderboard should show 'Best wave' reached across all runs")
+	}
+}
+
+func TestView_BestWaveShowsMaxAcrossEntries(t *testing.T) {
+	m := newGame()
+	m.state = StateLeaderboard
+	m.scores = []ScoreEntry{{Score: 200, Wave: 2}, {Score: 80, Wave: 7}}
+	view := m.View()
+	if !strings.Contains(view, "7") {
+		t.Error("leaderboard Best wave should reflect the highest wave ever reached (7)")
+	}
+}
+
 func TestView_ModeSelectShowsOptions(t *testing.T) {
 	m := newGame()
 	m.state = StateModeSelect

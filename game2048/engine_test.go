@@ -515,3 +515,103 @@ func TestApplyMove_WonStateContinues(t *testing.T) {
 		t.Error("continued game should allow moves after winning")
 	}
 }
+
+// ── target tile ───────────────────────────────────────────────────────────────
+
+func TestApplyMove_CustomTargetTile512(t *testing.T) {
+	m := newGame()
+	m.targetTile = 512
+	m.board = boardWith([BoardSize][BoardSize]int{
+		{256, 256, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	})
+	m = applyMove(m, DirLeft)
+	if m.state != StateWon {
+		t.Errorf("state = %v, want StateWon when targetTile=512 and board reaches 512", m.state)
+	}
+}
+
+func TestApplyMove_CustomTargetTile4096(t *testing.T) {
+	m := newGame()
+	m.targetTile = 4096
+	m.board = boardWith([BoardSize][BoardSize]int{
+		{1024, 1024, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	})
+	m = applyMove(m, DirLeft)
+	// reaching 2048 with target=4096 should NOT trigger win
+	if m.state == StateWon {
+		t.Error("should not win at 2048 when targetTile is 4096")
+	}
+}
+
+func TestApplyMove_DefaultTargetIsStill2048(t *testing.T) {
+	m := newGame()
+	// targetTile = 0 means use default 2048
+	m.board = boardWith([BoardSize][BoardSize]int{
+		{1024, 1024, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	})
+	m = applyMove(m, DirLeft)
+	if m.state != StateWon {
+		t.Errorf("state = %v, want StateWon at 2048 with default target", m.state)
+	}
+}
+
+// ── slideRowWithBonus ─────────────────────────────────────────────────────────
+
+func TestSlideRowWithBonus_NoBonusMatchesNormal(t *testing.T) {
+	row := [BoardSize]int{4, 4, 0, 0}
+	var bonus [BoardSize]bool
+	_, _, score := slideRowWithBonus(row, bonus)
+	if score != 8 {
+		t.Errorf("score = %d, want 8 (no bonus, normal merge)", score)
+	}
+}
+
+func TestSlideRowWithBonus_BonusDoublesScore(t *testing.T) {
+	row := [BoardSize]int{4, 4, 0, 0}
+	bonus := [BoardSize]bool{false, true, false, false}
+	_, _, score := slideRowWithBonus(row, bonus)
+	if score != 16 {
+		t.Errorf("score = %d, want 16 (bonus tile doubles merge score)", score)
+	}
+}
+
+func TestSlideRowWithBonus_FirstTileBonusAlsoDoubles(t *testing.T) {
+	row := [BoardSize]int{4, 4, 0, 0}
+	bonus := [BoardSize]bool{true, false, false, false}
+	_, _, score := slideRowWithBonus(row, bonus)
+	if score != 16 {
+		t.Errorf("score = %d, want 16 (bonus on first tile also doubles)", score)
+	}
+}
+
+func TestSlideRowWithBonus_BonusTileDoesNotPropagateToMerged(t *testing.T) {
+	row := [BoardSize]int{4, 4, 0, 0}
+	bonus := [BoardSize]bool{false, true, false, false}
+	_, newBonus, _ := slideRowWithBonus(row, bonus)
+	// After merge, no bonus tiles remain (bonus is consumed)
+	for i, b := range newBonus {
+		if b {
+			t.Errorf("bonus[%d] = true, want false (bonus consumed on merge)", i)
+		}
+	}
+}
+
+func TestSlideRowWithBonus_NoMerge_BonusPreserved(t *testing.T) {
+	// Bonus tile that doesn't merge should keep its bonus marker
+	row := [BoardSize]int{0, 4, 0, 8}
+	bonus := [BoardSize]bool{false, true, false, false}
+	_, newBonus, _ := slideRowWithBonus(row, bonus)
+	// After sliding left: [4, 8, 0, 0]. The 4 (was bonus) should still be bonus
+	if !newBonus[0] {
+		t.Error("bonus marker should be preserved when tile doesn't merge")
+	}
+}

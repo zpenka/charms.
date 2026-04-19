@@ -3,8 +3,11 @@ package snake
 import "math/rand"
 
 const (
-	Width  = 40
-	Height = 20
+	Width            = 40
+	Height           = 20
+	GhostDuration    = 10 // moves of ghost mode after eating bonus food
+	BonusFoodDuration = 40 // ticks before bonus food expires
+	BonusSpawnEvery  = 30  // ticks between bonus food spawn attempts
 )
 
 type gameState int
@@ -27,16 +30,20 @@ const (
 type pos struct{ x, y int }
 
 type model struct {
-	snake     []pos
-	dir       dir
-	nextDir   dir
-	food      pos
-	obstacles []pos
-	score     int
-	tick      int
-	state     gameState
-	scores    []ScoreEntry
-	scorePath string
+	snake           []pos
+	dir             dir
+	nextDir         dir
+	food            pos
+	bonusFood       pos
+	bonusFoodActive bool
+	bonusFoodTicks  int
+	ghostTicks      int
+	obstacles       []pos
+	score           int
+	tick            int
+	state           gameState
+	scores          []ScoreEntry
+	scorePath       string
 }
 
 func newGame() model {
@@ -126,6 +133,24 @@ func placeFood(m model) model {
 	}
 }
 
+func addObstacle(m model) model {
+	occupied := make(map[pos]bool, len(m.snake)+len(m.obstacles)+1)
+	for _, p := range m.snake {
+		occupied[p] = true
+	}
+	for _, p := range m.obstacles {
+		occupied[p] = true
+	}
+	occupied[m.food] = true
+	for {
+		p := pos{rand.Intn(Width), rand.Intn(Height)}
+		if !occupied[p] {
+			m.obstacles = append(m.obstacles, p)
+			return m
+		}
+	}
+}
+
 func moveSnake(m model) model {
 	head := m.snake[0]
 	var next pos
@@ -144,11 +169,13 @@ func moveSnake(m model) model {
 	next.x = (next.x + Width) % Width
 	next.y = (next.y + Height) % Height
 
-	// obstacle collision
-	for _, p := range m.obstacles {
-		if p == next {
-			m.state = StateGameOver
-			return m
+	// obstacle collision — skipped in ghost mode
+	if m.ghostTicks <= 0 {
+		for _, p := range m.obstacles {
+			if p == next {
+				m.state = StateGameOver
+				return m
+			}
 		}
 	}
 
@@ -160,16 +187,47 @@ func moveSnake(m model) model {
 		}
 	}
 
-	if next == m.food {
-		// grow: prepend head, keep tail
-		m.snake = append([]pos{next}, m.snake...)
-		m.score++
-		m = placeFood(m)
+	if m.bonusFoodActive && next == m.bonusFood {
+		m.score += 3
+		m.bonusFoodActive = false
+		m.ghostTicks = GhostDuration
+		m.snake = append([]pos{next}, m.snake...) // bonus food grows snake
 	} else {
-		// move: prepend head, drop tail
-		m.snake = append([]pos{next}, m.snake[:len(m.snake)-1]...)
+		if m.ghostTicks > 0 {
+			m.ghostTicks--
+		}
+		if next == m.food {
+			m.snake = append([]pos{next}, m.snake...)
+			m.score++
+			if m.score%5 == 0 {
+				m = addObstacle(m)
+			}
+			m = placeFood(m)
+		} else {
+			m.snake = append([]pos{next}, m.snake[:len(m.snake)-1]...)
+		}
 	}
 	return m
+}
+
+func placeBonusFood(m model) model {
+	occupied := make(map[pos]bool, len(m.snake)+len(m.obstacles)+1)
+	for _, p := range m.snake {
+		occupied[p] = true
+	}
+	for _, p := range m.obstacles {
+		occupied[p] = true
+	}
+	occupied[m.food] = true
+	for {
+		p := pos{rand.Intn(Width), rand.Intn(Height)}
+		if !occupied[p] {
+			m.bonusFood = p
+			m.bonusFoodActive = true
+			m.bonusFoodTicks = BonusFoodDuration
+			return m
+		}
+	}
 }
 
 func tickGame(m model) model {
@@ -177,6 +235,16 @@ func tickGame(m model) model {
 		return m
 	}
 	m.tick++
+
+	if m.bonusFoodActive {
+		m.bonusFoodTicks--
+		if m.bonusFoodTicks <= 0 {
+			m.bonusFoodActive = false
+		}
+	} else if m.tick%BonusSpawnEvery == 0 {
+		m = placeBonusFood(m)
+	}
+
 	if m.tick%moveEvery(m.score) == 0 {
 		m.dir = m.nextDir
 		m = moveSnake(m)

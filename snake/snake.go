@@ -10,15 +10,16 @@ import (
 )
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	scoreStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
-	headStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
-	bodyStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ECC71"))
-	foodStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")).Bold(true)
-	obstacleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	borderStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
-	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
-	alertStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
+	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	scoreStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
+	headStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
+	bodyStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ECC71"))
+	foodStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B6B")).Bold(true)
+	bonusFoodStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
+	obstacleStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	borderStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	msgStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
+	alertStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
 )
 
 type tickMsg struct{}
@@ -72,6 +73,10 @@ func (m model) View() string {
 	sb.WriteString(scoreStyle.Render(fmt.Sprintf("Score: %d", m.score)))
 	sb.WriteString("  ")
 	sb.WriteString(msgStyle.Render(fmt.Sprintf("Length: %d", len(m.snake))))
+	if m.ghostTicks > 0 {
+		sb.WriteString("  ")
+		sb.WriteString(alertStyle.Render("GHOST"))
+	}
 	sb.WriteString("\n\n")
 
 	// Build cell lookup
@@ -100,6 +105,8 @@ func (m model) View() string {
 				sb.WriteString(headStyle.Render("@"))
 			case bodySet[p]:
 				sb.WriteString(bodyStyle.Render("o"))
+			case m.bonusFoodActive && p == m.bonusFood:
+				sb.WriteString(bonusFoodStyle.Render("$"))
 			case p == m.food:
 				sb.WriteString(foodStyle.Render("*"))
 			case obsSet[p]:

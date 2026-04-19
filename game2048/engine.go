@@ -7,7 +7,8 @@ const BoardSize = 4
 type gameState int
 
 const (
-	StatePlaying   gameState = iota
+	StateTargetSelect gameState = iota
+	StatePlaying
 	StateWon
 	StateGameOver
 	StateLeaderboard
@@ -25,15 +26,17 @@ const (
 type board [BoardSize][BoardSize]int
 
 type model struct {
-	board     board
-	score     int
-	state     gameState
-	continued bool
-	hasPrev   bool
-	prevBoard board
-	prevScore int
-	scores    []ScoreEntry
-	scorePath string
+	board       board
+	score       int
+	state       gameState
+	continued   bool
+	hasPrev     bool
+	prevBoard   board
+	prevScore   int
+	targetTile  int
+	allTimeBest int
+	scores      []ScoreEntry
+	scorePath   string
 }
 
 func newGame() model {
@@ -45,11 +48,18 @@ func newGameWithScores(scores []ScoreEntry, path string) model {
 	var b board
 	b = addTile(b)
 	b = addTile(b)
+	best := 0
+	for _, e := range scores {
+		if e.Score > best {
+			best = e.Score
+		}
+	}
 	return model{
-		board:     b,
-		state:     StatePlaying,
-		scores:    scores,
-		scorePath: path,
+		board:       b,
+		state:       StatePlaying,
+		scores:      scores,
+		scorePath:   path,
+		allTimeBest: best,
 	}
 }
 
@@ -81,6 +91,46 @@ func slideRow(row [BoardSize]int) ([BoardSize]int, int) {
 		result[i] = v
 	}
 	return result, score
+}
+
+// slideRowWithBonus slides a row like slideRow but doubles the merge score when
+// either merging tile has a bonus marker. Bonus markers are consumed on merge
+// and preserved through a slide without merge.
+func slideRowWithBonus(row [BoardSize]int, bonus [BoardSize]bool) ([BoardSize]int, [BoardSize]bool, int) {
+	// compact: collect non-zero values and their bonus markers
+	var vals []int
+	var bonuses []bool
+	for i, v := range row {
+		if v != 0 {
+			vals = append(vals, v)
+			bonuses = append(bonuses, bonus[i])
+		}
+	}
+	score := 0
+	var merged []int
+	var mergedBonus []bool
+	for i := 0; i < len(vals); i++ {
+		if i+1 < len(vals) && vals[i] == vals[i+1] {
+			pts := vals[i] * 2
+			if bonuses[i] || bonuses[i+1] {
+				pts *= 2
+			}
+			merged = append(merged, vals[i]*2)
+			mergedBonus = append(mergedBonus, false) // bonus consumed on merge
+			score += pts
+			i++
+		} else {
+			merged = append(merged, vals[i])
+			mergedBonus = append(mergedBonus, bonuses[i])
+		}
+	}
+	var result [BoardSize]int
+	var resultBonus [BoardSize]bool
+	for i, v := range merged {
+		result[i] = v
+		resultBonus[i] = mergedBonus[i]
+	}
+	return result, resultBonus, score
 }
 
 func transpose(b board) board {
@@ -231,7 +281,11 @@ func applyMove(m model, d direction) model {
 	m.board = addTile(newBoard)
 	m.score += gained
 
-	if !m.continued && hasWon(m.board) {
+	goal := m.targetTile
+	if goal == 0 {
+		goal = 2048
+	}
+	if !m.continued && maxTile(m.board) >= goal {
 		m.state = StateWon
 		return m
 	}

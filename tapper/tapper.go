@@ -20,6 +20,7 @@ var (
 	custDangerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#E74C3C")).Bold(true)
 	thirstyStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4500")).Bold(true)
 	vipStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Bold(true)
+	slowMoStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ECDC4")).Bold(true)
 	bartenderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#A29BFE")).Bold(true)
 	msgStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA"))
 	alertStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
@@ -125,6 +126,10 @@ func (m model) View() string {
 		sb.WriteString("  ")
 		sb.WriteString(comboStyle.Render(fmt.Sprintf("Combo ×%d", m.combo)))
 	}
+	if m.slowMoTicks > 0 {
+		sb.WriteString("  ")
+		sb.WriteString(alertStyle.Render("SLOW MO"))
+	}
 	sb.WriteString("\n\n")
 
 	if m.paused {
@@ -173,6 +178,8 @@ func (m model) View() string {
 					sb.WriteString(thirstyStyle.Render("!"))
 				case KindVIP:
 					sb.WriteString(vipStyle.Render("$"))
+				case KindSlowMo:
+					sb.WriteString(slowMoStyle.Render("~"))
 				default:
 					var cs lipgloss.Style
 					switch {
@@ -231,6 +238,17 @@ func (m model) View() string {
 			} else {
 				sb.WriteString(msgStyle.Render(line))
 			}
+			sb.WriteString("\n")
+		}
+		if len(m.scores) > 0 {
+			best := 0
+			for _, e := range m.scores {
+				if e.Wave > best {
+					best = e.Wave
+				}
+			}
+			sb.WriteString("\n")
+			sb.WriteString(msgStyle.Render(fmt.Sprintf(" Best wave: %d", best)))
 			sb.WriteString("\n")
 		}
 		sb.WriteString("\n ")
