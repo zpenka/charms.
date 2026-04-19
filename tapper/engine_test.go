@@ -690,3 +690,30 @@ func TestWaveBonus_AddedToScoreOnClear(t *testing.T) {
 		t.Errorf("score = %d, want %d (bonus applied on clear)", m.score, before+want)
 	}
 }
+
+// ── endless mode ─────────────────────────────────────────────────────────────
+
+func TestTickGame_EndlessSkipsWaveClear(t *testing.T) {
+	m := newGame()
+	m.endless = true
+	m.spawnsLeft = 0
+	m.customers = nil
+	m.mugs = nil
+	m = tickGame(m)
+	if m.state == StateWaveClear {
+		t.Error("endless mode should not enter StateWaveClear")
+	}
+}
+
+func TestTickGame_EndlessAutoAdvancesWave(t *testing.T) {
+	m := newGame()
+	m.endless = true
+	m.wave = 1
+	m.spawnsLeft = 0
+	m.customers = nil
+	m.mugs = nil
+	m = tickGame(m)
+	if m.wave != 2 {
+		t.Errorf("wave = %d, want 2 after auto-advance in endless mode", m.wave)
+	}
+}

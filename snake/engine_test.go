@@ -34,6 +34,7 @@ func TestNewGame_FoodNotOnSnake(t *testing.T) {
 func TestMoveSnake_MovesHeadRight(t *testing.T) {
 	m := newGame()
 	m.food = pos{0, 0} // keep food out of the way
+	m.obstacles = nil
 	head := m.snake[0]
 	m = moveSnake(m)
 	want := pos{head.x + 1, head.y}
@@ -45,6 +46,7 @@ func TestMoveSnake_MovesHeadRight(t *testing.T) {
 func TestMoveSnake_TailDropsOnMove(t *testing.T) {
 	m := newGame()
 	m.food = pos{0, 0}
+	m.obstacles = nil
 	length := len(m.snake)
 	m = moveSnake(m)
 	if len(m.snake) != length {
@@ -54,6 +56,7 @@ func TestMoveSnake_TailDropsOnMove(t *testing.T) {
 
 func TestMoveSnake_GrowsOnFood(t *testing.T) {
 	m := newGame()
+	m.obstacles = nil
 	length := len(m.snake)
 	m.food = pos{m.snake[0].x + 1, m.snake[0].y}
 	m = moveSnake(m)
@@ -64,6 +67,7 @@ func TestMoveSnake_GrowsOnFood(t *testing.T) {
 
 func TestMoveSnake_ScoreIncreasesOnFood(t *testing.T) {
 	m := newGame()
+	m.obstacles = nil
 	m.food = pos{m.snake[0].x + 1, m.snake[0].y}
 	m = moveSnake(m)
 	if m.score != 1 {
@@ -74,43 +78,118 @@ func TestMoveSnake_ScoreIncreasesOnFood(t *testing.T) {
 func TestMoveSnake_WallCollision_Right(t *testing.T) {
 	m := newGame()
 	m.snake = []pos{{Width - 1, 5}}
+	m.food = pos{0, 0}
+	m.obstacles = nil
 	m.dir = DirRight
 	m = moveSnake(m)
-	if m.state != StateGameOver {
-		t.Error("should be game over hitting right wall")
+	if m.state == StateGameOver {
+		t.Error("portal walls: right edge should wrap, not game over")
+	}
+	if m.snake[0].x != 0 {
+		t.Errorf("portal wrap right: head.x = %d, want 0", m.snake[0].x)
 	}
 }
 
 func TestMoveSnake_WallCollision_Left(t *testing.T) {
 	m := newGame()
 	m.snake = []pos{{0, 5}}
+	m.food = pos{0, 0}
+	m.obstacles = nil
 	m.dir = DirLeft
 	m.nextDir = DirLeft
 	m = moveSnake(m)
-	if m.state != StateGameOver {
-		t.Error("should be game over hitting left wall")
+	if m.state == StateGameOver {
+		t.Error("portal walls: left edge should wrap, not game over")
+	}
+	if m.snake[0].x != Width-1 {
+		t.Errorf("portal wrap left: head.x = %d, want %d", m.snake[0].x, Width-1)
 	}
 }
 
 func TestMoveSnake_WallCollision_Top(t *testing.T) {
 	m := newGame()
 	m.snake = []pos{{5, 0}}
+	m.food = pos{0, 0}
+	m.obstacles = nil
 	m.dir = DirUp
 	m.nextDir = DirUp
 	m = moveSnake(m)
-	if m.state != StateGameOver {
-		t.Error("should be game over hitting top wall")
+	if m.state == StateGameOver {
+		t.Error("portal walls: top edge should wrap, not game over")
+	}
+	if m.snake[0].y != Height-1 {
+		t.Errorf("portal wrap top: head.y = %d, want %d", m.snake[0].y, Height-1)
 	}
 }
 
 func TestMoveSnake_WallCollision_Bottom(t *testing.T) {
 	m := newGame()
 	m.snake = []pos{{5, Height - 1}}
+	m.food = pos{0, 0}
+	m.obstacles = nil
 	m.dir = DirDown
 	m.nextDir = DirDown
 	m = moveSnake(m)
+	if m.state == StateGameOver {
+		t.Error("portal walls: bottom edge should wrap, not game over")
+	}
+	if m.snake[0].y != 0 {
+		t.Errorf("portal wrap bottom: head.y = %d, want 0", m.snake[0].y)
+	}
+}
+
+// ── obstacles ────────────────────────────────────────────────────────────────
+
+func TestNewGame_HasObstacles(t *testing.T) {
+	m := newGame()
+	if len(m.obstacles) == 0 {
+		t.Error("new game should have obstacle tiles")
+	}
+}
+
+func TestMoveSnake_ObstacleCollision(t *testing.T) {
+	m := newGame()
+	m.snake = []pos{{5, 5}}
+	m.dir = DirRight
+	m.nextDir = DirRight
+	m.food = pos{0, 0}
+	m.obstacles = []pos{{6, 5}}
+	m = moveSnake(m)
 	if m.state != StateGameOver {
-		t.Error("should be game over hitting bottom wall")
+		t.Error("hitting an obstacle should cause game over")
+	}
+}
+
+func TestPlaceFood_AvoidsObstacles(t *testing.T) {
+	m := newGame()
+	var obs []pos
+	for y := 0; y < Height; y++ {
+		for x := 0; x < Width; x++ {
+			if !(x == 0 && y == 0) {
+				obs = append(obs, pos{x, y})
+			}
+		}
+	}
+	m.snake = nil
+	m.obstacles = obs
+	m = placeFood(m)
+	if m.food != (pos{0, 0}) {
+		t.Errorf("food = %v, want {0,0} (only non-obstacle cell)", m.food)
+	}
+}
+
+func TestObstacles_NotOnSnakeStart(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		m := newGame()
+		obsSet := make(map[pos]bool)
+		for _, o := range m.obstacles {
+			obsSet[o] = true
+		}
+		for _, p := range m.snake {
+			if obsSet[p] {
+				t.Errorf("obstacle placed on starting snake position %v", p)
+			}
+		}
 	}
 }
 
@@ -187,6 +266,7 @@ func TestMoveEvery_HasMinimum(t *testing.T) {
 
 func TestPlaceFood_AvoidsSnake(t *testing.T) {
 	m := newGame()
+	m.obstacles = nil
 	// fill every cell except (0,0) with snake body
 	var body []pos
 	for y := 0; y < Height; y++ {
@@ -227,6 +307,7 @@ func TestTickGame_IncrementsTick(t *testing.T) {
 func TestTickGame_MovesSnakeOnInterval(t *testing.T) {
 	m := newGame()
 	m.food = pos{0, 0}
+	m.obstacles = nil
 	head := m.snake[0]
 	interval := moveEvery(0)
 	for i := 0; i < interval; i++ {
@@ -240,6 +321,7 @@ func TestTickGame_MovesSnakeOnInterval(t *testing.T) {
 func TestTickGame_AppliesBufferedDir(t *testing.T) {
 	m := newGame() // moving right
 	m.food = pos{0, 0}
+	m.obstacles = nil
 	m = changeDir(m, DirUp)
 	interval := moveEvery(0)
 	for i := 0; i < interval; i++ {

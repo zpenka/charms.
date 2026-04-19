@@ -138,6 +138,30 @@ func TestUpdate_LeaderboardSpaceStartsNewGame(t *testing.T) {
 	}
 }
 
+func TestUpdate_ZKeyUndoes(t *testing.T) {
+	m := newGame()
+	m.board = board{}
+	m.board[0][3] = 2
+	prevBoard := m.board
+	updated, _ := m.Update(press("left"))
+	m = updated.(model)
+	updated2, _ := m.Update(press("z"))
+	got := updated2.(model)
+	if got.board != prevBoard {
+		t.Error("z key should undo the last move")
+	}
+}
+
+func TestView_ShowsBestTileInHUD(t *testing.T) {
+	m := newGame()
+	m.board = board{}
+	m.board[0][0] = 512
+	view := m.View()
+	if !strings.Contains(view, "Best") {
+		t.Error("view HUD should show 'Best' tile label")
+	}
+}
+
 func TestView_LeaderboardShowsScores(t *testing.T) {
 	m := newGame()
 	m.state = StateLeaderboard

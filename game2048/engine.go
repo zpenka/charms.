@@ -29,6 +29,9 @@ type model struct {
 	score     int
 	state     gameState
 	continued bool
+	hasPrev   bool
+	prevBoard board
+	prevScore int
 	scores    []ScoreEntry
 	scorePath string
 }
@@ -187,6 +190,28 @@ func canMove(b board) bool {
 	return false
 }
 
+func undoMove(m model) model {
+	if !m.hasPrev {
+		return m
+	}
+	m.board = m.prevBoard
+	m.score = m.prevScore
+	m.hasPrev = false
+	return m
+}
+
+func maxTile(b board) int {
+	best := 0
+	for r := 0; r < BoardSize; r++ {
+		for c := 0; c < BoardSize; c++ {
+			if b[r][c] > best {
+				best = b[r][c]
+			}
+		}
+	}
+	return best
+}
+
 func applyMove(m model, d direction) model {
 	if m.state == StateGameOver {
 		return m
@@ -200,6 +225,9 @@ func applyMove(m model, d direction) model {
 		return m
 	}
 
+	m.prevBoard = m.board
+	m.prevScore = m.score
+	m.hasPrev = true
 	m.board = addTile(newBoard)
 	m.score += gained
 

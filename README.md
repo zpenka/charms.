@@ -96,11 +96,20 @@ Valid move destinations are highlighted on the board. After every move, the from
 
 **Pawn promotion:** when you move a pawn to the back rank, a picker appears — press `Q`, `R`, `B`, or `N` to choose. The computer always promotes to a queen automatically.
 
+**Captured pieces:** pieces taken by each side are listed below the clocks (e.g. `Captured by White: ♟ ♟`).
+
+**PGN:** when the game ends, full PGN notation is shown below the board so you can review or copy the game.
+
 ---
 
 ### Tapper
 
-A terminal take on the classic 1983 arcade game. Slide beer mugs down four bar lanes to serve customers walking in from the right. Miss a customer and your mug falls off the end — lose a life. Let a customer reach the bar — lose a life. Three lives per game, eight waves to start.
+A terminal take on the classic 1983 arcade game. Slide beer mugs down four bar lanes to serve customers walking in from the right. Miss a customer and your mug falls off the end — lose a life. Let a customer reach the bar — lose a life. Three lives per game.
+
+On launch, choose your mode:
+
+- `1` — Waves (eight waves, then done)
+- `2` — Endless (waves keep coming forever, no wave-clear screen)
 
 **Controls:**
 
@@ -127,7 +136,7 @@ After game over, scores are saved to `~/.local/share/charms/tapper_scores.json` 
 
 ### Snake
 
-The classic game. Eat food (`*`) to grow your snake. Don't hit the walls or your own tail.
+The classic game. Eat food (`*`) to grow your snake. Don't hit obstacles or your own tail.
 
 **Controls:**
 
@@ -135,6 +144,10 @@ The classic game. Eat food (`*`) to grow your snake. Don't hit the walls or your
 |-----|--------|
 | `↑↓←→` / `wasd` | Steer |
 | `q` | Quit to lobby |
+
+**Portal walls:** the edges of the board wrap around — exiting one side brings you out the other. No wall deaths.
+
+**Obstacles:** each game spawns a set of `█` tiles scattered around the board. Running into one ends the game.
 
 Speed increases as you grow. After game over, your length is saved to `~/.local/share/charms/snake_scores.json` and a leaderboard shows your top 5 runs.
 
@@ -149,7 +162,8 @@ Slide all tiles in one direction with each keypress. Tiles with equal values mer
 | Key | Action |
 |-----|--------|
 | `↑↓←→` / `wasd` | Slide tiles |
+| `z` | Undo last move (one level) |
 | `Space` | Continue after winning / confirm on end screens |
 | `q` | Quit to lobby |
 
-Each merge adds to your score (e.g. merging two 512s scores 1024). After game over, scores are saved to `~/.local/share/charms/2048_scores.json` and a leaderboard shows your top 5 runs.
+Each merge adds to your score (e.g. merging two 512s scores 1024). The HUD shows your current score and the highest tile on the board. After game over, scores are saved to `~/.local/share/charms/2048_scores.json` and a leaderboard shows your top 5 runs.

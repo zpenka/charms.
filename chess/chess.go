@@ -700,6 +700,20 @@ func (m model) View() string {
 	sb.WriteString(fmt.Sprintf("  White: %s   Black: %s\n\n",
 		formatClock(m.whiteTime), formatClock(m.blackTime)))
 
+	// Captured pieces
+	byWhite, byBlack := capturedPieces(m.game)
+	if len(byWhite)+len(byBlack) > 0 {
+		sb.WriteString("  Captured by White:")
+		for _, p := range byWhite {
+			sb.WriteString(" " + pieceGlyph(p))
+		}
+		sb.WriteString("\n  Captured by Black:")
+		for _, p := range byBlack {
+			sb.WriteString(" " + pieceGlyph(p))
+		}
+		sb.WriteString("\n\n")
+	}
+
 	if m.promoting {
 		sb.WriteString("  [Q]ueen  [R]ook  [B]ishop  [N]knight\n\n")
 	}
@@ -711,6 +725,15 @@ func (m model) View() string {
 		}
 		for _, l := range lines[start:] {
 			sb.WriteString(" " + msgStyle.Render(l) + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	// PGN on game over
+	if m.game.Outcome() != chess.NoOutcome || m.resigned {
+		pgn := m.game.String()
+		for _, line := range strings.Split(strings.TrimSpace(pgn), "\n") {
+			sb.WriteString(" " + msgStyle.Render(line) + "\n")
 		}
 		sb.WriteString("\n")
 	}
