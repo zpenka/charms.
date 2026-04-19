@@ -38,12 +38,12 @@ var (
 )
 
 var glyphs = map[chess.PieceType][2]string{
-	chess.King:   {"♔", "♚"},
-	chess.Queen:  {"♕", "♛"},
-	chess.Rook:   {"♖", "♜"},
-	chess.Bishop: {"♗", "♝"},
-	chess.Knight: {"♘", "♞"},
-	chess.Pawn:   {"♙", "♟"},
+	chess.King:   {"♚", "♚"},
+	chess.Queen:  {"♛", "♛"},
+	chess.Rook:   {"♜", "♜"},
+	chess.Bishop: {"♝", "♝"},
+	chess.Knight: {"♞", "♞"},
+	chess.Pawn:   {"♟", "♟"},
 }
 
 type computerMoveMsg struct{ move *chess.Move }
@@ -607,10 +607,10 @@ func (m model) View() string {
 	sb.WriteString(fileLabels)
 
 	sc := schemes[m.schemeIdx]
-	sqLight     := lipgloss.NewStyle().Background(lipgloss.Color(sc.light)).Foreground(lipgloss.Color("#1a1a1a"))
-	sqDark      := lipgloss.NewStyle().Background(lipgloss.Color(sc.dark)).Foreground(lipgloss.Color("#1a1a1a"))
-	sqMoveLight := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveLight)).Foreground(lipgloss.Color("#1a1a1a"))
-	sqMoveDark  := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveDark)).Foreground(lipgloss.Color("#ffffff"))
+	sqLight     := lipgloss.NewStyle().Background(lipgloss.Color(sc.light)).Foreground(lipgloss.Color("#555555"))
+	sqDark      := lipgloss.NewStyle().Background(lipgloss.Color(sc.dark)).Foreground(lipgloss.Color("#cccccc"))
+	sqMoveLight := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveLight)).Foreground(lipgloss.Color("#555555"))
+	sqMoveDark  := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveDark)).Foreground(lipgloss.Color("#cccccc"))
 
 	board := m.game.Position().Board()
 
@@ -677,14 +677,11 @@ func (m model) View() string {
 				style = sqDark
 			}
 
-			// Always render pieces in their own colour so white pieces aren't
-			// made dark by a light-square foreground, and black pieces aren't
-			// turned white by a last-move highlight's foreground.
 			if piece != chess.NoPiece {
 				if piece.Color() == chess.White {
-					style = style.Foreground(lipgloss.Color("#FFFFFF"))
+					style = style.Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 				} else {
-					style = style.Foreground(lipgloss.Color("#1a1a1a"))
+					style = style.Foreground(lipgloss.Color("#000000")).Bold(true)
 				}
 			}
 
