@@ -149,7 +149,7 @@ The classic game. Eat food (`*`) to grow your snake. Don't hit obstacles or your
 
 | Key | Action |
 |-----|--------|
-| `↑↓←→` / `wasd` | Steer |
+| `↑↓←→` / `wasd` / `hjkl` | Steer |
 | `q` | Quit to lobby |
 
 **Portal walls:** the edges of the board wrap around — exiting one side brings you out the other. No wall deaths.
@@ -177,7 +177,7 @@ Slide all tiles in one direction with each keypress. Tiles with equal values mer
 
 | Key | Action |
 |-----|--------|
-| `↑↓←→` / `wasd` | Slide tiles |
+| `↑↓←→` / `wasd` / `hjkl` | Slide tiles |
 | `z` | Undo last move (one level) |
 | `Space` | Continue after winning / confirm on end screens |
 | `q` | Quit to lobby |

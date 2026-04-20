@@ -83,11 +83,11 @@ func TestBoardFlip_ViewChangesWhenFlipped(t *testing.T) {
 		t.Error("flipped and unflipped views should differ")
 	}
 
-	if !strings.Contains(uv, "a  b  c") {
-		t.Errorf("unflipped view should contain 'a  b  c', got: %q", uv[:min(200, len(uv))])
+	if !strings.Contains(uv, "a    b    c") {
+		t.Errorf("unflipped view should contain 'a    b    c', got: %q", uv[:min(200, len(uv))])
 	}
-	if !strings.Contains(fv, "h  g  f") {
-		t.Errorf("flipped view should contain 'h  g  f', got: %q", fv[:min(200, len(fv))])
+	if !strings.Contains(fv, "h    g    f") {
+		t.Errorf("flipped view should contain 'h    g    f', got: %q", fv[:min(200, len(fv))])
 	}
 }
 

@@ -56,6 +56,12 @@ func cellText(v int) string {
 func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+	}
 	if km, ok := msg.(tea.KeyMsg); ok {
 		if m.state == StateTargetSelect {
 			switch km.String() {
@@ -83,13 +89,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch km.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "left", "a":
+		case "left", "a", "h":
 			return applyMove(m, DirLeft), nil
-		case "right", "d":
+		case "right", "d", "l":
 			return applyMove(m, DirRight), nil
-		case "up", "w":
+		case "up", "w", "k":
 			return applyMove(m, DirUp), nil
-		case "down", "s":
+		case "down", "s", "j":
 			return applyMove(m, DirDown), nil
 		case "z":
 			return undoMove(m), nil
@@ -198,11 +204,15 @@ func (m model) View() string {
 		sb.WriteString(msgStyle.Render("Space to play again  q to quit"))
 		sb.WriteString("\n\n")
 	default:
-		sb.WriteString(msgStyle.Render(" ↑↓←→ / wasd  move   z  undo   q  quit"))
+		sb.WriteString(msgStyle.Render(" ↑↓←→ / wasd / hjkl  move   z  undo   q  quit"))
 		sb.WriteString("\n\n")
 	}
 
-	return sb.String()
+	content := sb.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func Run() {

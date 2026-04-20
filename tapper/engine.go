@@ -69,6 +69,8 @@ type model struct {
 	lastServeTickByLane [Lanes]int
 	scores              []ScoreEntry
 	scorePath           string
+	width               int
+	height              int
 }
 
 func newGame() model {

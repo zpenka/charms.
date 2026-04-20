@@ -44,6 +44,8 @@ type model struct {
 	state           gameState
 	scores          []ScoreEntry
 	scorePath       string
+	width           int
+	height          int
 }
 
 func newGame() model {
