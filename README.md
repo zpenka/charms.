@@ -2,6 +2,10 @@
 
 A collection of [Charm](https://charm.sh) TUI games built with [Bubble Tea](https://github.com/charmbracelet/bubbletea): Chess, Tapper, Snake, and 2048.
 
+
+<img width="636" height="347" alt="Screenshot 2026-04-20 at 10 16 26" src="https://github.com/user-attachments/assets/aeef5ba8-4d5e-492e-8ca5-f144f14de4c8" />
+
+
 ## Install
 
 ### Homebrew (macOS / Linux)
