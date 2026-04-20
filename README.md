@@ -57,6 +57,10 @@ go test ./chess/...
 
 A fully playable chess game in your terminal — two player or vs a computer opponent.
 
+
+<img width="665" height="722" alt="Screenshot 2026-04-20 at 10 17 08" src="https://github.com/user-attachments/assets/7602dea0-2884-4341-825d-8b027be5e932" />
+
+
 On launch, choose your mode:
 
 - `1` — Two player (pass and play)
@@ -115,6 +119,11 @@ Valid move destinations are highlighted on the board. After every move, the from
 
 A terminal take on the classic 1983 arcade game. Slide beer mugs down four bar lanes to serve customers walking in from the right. Miss a customer and your mug falls off the end — lose a life. Let a customer reach the bar — lose a life. Three lives per game.
 
+
+<img width="543" height="430" alt="Screenshot 2026-04-20 at 10 17 24" src="https://github.com/user-attachments/assets/d0634c82-c73c-4934-85f9-b2406fd1c655" />
+
+
+
 On launch, choose your mode:
 
 - `1` — Waves (eight waves, then done)
@@ -149,6 +158,11 @@ After game over, scores are saved to `~/.local/share/charms/tapper_scores.json` 
 
 The classic game. Eat food (`*`) to grow your snake. Don't hit obstacles or your own tail.
 
+
+<img width="683" height="720" alt="Screenshot 2026-04-20 at 10 17 51" src="https://github.com/user-attachments/assets/80ff7f9c-7d43-4454-923f-9031050dc04b" />
+
+
+
 **Controls:**
 
 | Key | Action |
@@ -169,6 +183,11 @@ Speed increases as you grow. After game over, your length is saved to `~/.local/
 ### 2048
 
 Slide all tiles in one direction with each keypress. Tiles with equal values merge into their sum. Reach your target tile to win — or keep going for a higher score.
+
+
+<img width="583" height="445" alt="Screenshot 2026-04-20 at 10 18 15" src="https://github.com/user-attachments/assets/a9abf745-3e50-4324-875c-d13c0262ea17" />
+
+
 
 **Target tile:** on the game start screen, choose your win condition:
 
