@@ -56,6 +56,12 @@ func cellText(v int) string {
 func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+	}
 	if km, ok := msg.(tea.KeyMsg); ok {
 		if m.state == StateTargetSelect {
 			switch km.String() {
@@ -202,7 +208,11 @@ func (m model) View() string {
 		sb.WriteString("\n\n")
 	}
 
-	return sb.String()
+	content := sb.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func Run() {

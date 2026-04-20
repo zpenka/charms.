@@ -36,6 +36,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
 		return tickGame(m), doTick()
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -154,7 +158,11 @@ func (m model) View() string {
 		sb.WriteString("\n\n")
 	}
 
-	return sb.String()
+	content := sb.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func Run() {
