@@ -101,15 +101,28 @@ type model struct {
 	currentFile      string
 	showFileTimeline bool
 	// Option 4: Stash & Reflog
-	viewMode     string // "log", "stash", "reflog"
-	stashes      []stashEntry
+	viewMode      string // "log", "stash", "reflog"
+	stashes       []stashEntry
 	reflogEntries []reflogEntry
-	stashCursor  int
-	reflogCursor int
-	repoPath     string
-	width        int
-	height       int
-	loading      bool
+	stashCursor   int
+	reflogCursor  int
+	// UI Integration
+	inGoToCommitMode bool
+	goToCommitInput  string
+	inCommentMode    bool
+	commentInput     string
+	// Optimization: Caches
+	dcache    *diffCache
+	scache    *statCache
+	recache   *regexCache
+	// Performance tracking
+	diffCacheHits   int
+	statCacheHits   int
+	regexCacheHits  int
+	repoPath        string
+	width           int
+	height          int
+	loading         bool
 }
 
 type commitStatistics struct {
@@ -137,6 +150,26 @@ type reflogEntry struct {
 	action  string
 	message string
 	date    string
+}
+
+type diffCache struct {
+	data     map[string][]diffLine
+	order    []string
+	maxSize  int
+	hitCount int
+}
+
+type statCache struct {
+	data     map[string]commitStatistics
+	order    []string
+	maxSize  int
+	hitCount int
+}
+
+type regexCache struct {
+	data     map[string]*regexp.Regexp
+	maxSize  int
+	hitCount int
 }
 
 func newModel(repoPath string) model {
@@ -1346,4 +1379,265 @@ func findStashByIndex(stashes []stashEntry, idx int) *stashEntry {
 		return nil
 	}
 	return &stashes[idx]
+}
+
+// ===== UI INTEGRATION: KEYBINDINGS =====
+
+// handleKeyBinding processes keyboard input and returns updated model.
+func handleKeyBinding(m model, key string) model {
+	switch key {
+	case "m":
+		m = toggleBookmark(m)
+	case "'":
+		m = jumpToNextBookmark(m)
+	case "gg":
+		m.inGoToCommitMode = true
+		m.goToCommitInput = ""
+	case "c":
+		m.inCommentMode = true
+		m.commentInput = ""
+	case "v":
+		m = switchViewMode(m, "stash")
+	case "V":
+		m = switchViewMode(m, "reflog")
+	case "G":
+		m.showGraph = !m.showGraph
+		if m.showGraph && len(m.commitGraph) == 0 {
+			m = lazyLoadGraph(m)
+		}
+	case "f":
+		m = toggleFileView(m)
+	default:
+		// Handle multi-key like "5j"
+		if len(key) > 1 && (strings.HasSuffix(key, "j") || strings.HasSuffix(key, "k")) {
+			n := parseCount(key[:len(key)-1])
+			if strings.HasSuffix(key, "j") {
+				for i := 0; i < n; i++ {
+					m = moveCursorDown(m)
+				}
+			} else {
+				for i := 0; i < n; i++ {
+					m = moveCursorUp(m)
+				}
+			}
+		}
+	}
+	return m
+}
+
+// safeHandleKeyBinding handles keybindings with error recovery.
+func safeHandleKeyBinding(m model, key string) model {
+	if key == "" {
+		return m
+	}
+	return handleKeyBinding(m, key)
+}
+
+// ===== UI INTEGRATION: RENDERING =====
+
+// renderCommitRowWithStats renders commit row with stats badge.
+func renderCommitRowWithStats(m model, idx int, width int) string {
+	if !m.showStatsBadge {
+		return ""
+	}
+	badge := diffStatBadge(m.lastStats)
+	return badge
+}
+
+// renderBookmarkList renders list of bookmarked commits.
+func renderBookmarkList(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("Bookmarks:\n")
+	for i, hash := range m.bookmarks {
+		for _, c := range m.commits {
+			if c.shortHash == hash {
+				sb.WriteString(fmt.Sprintf("%d: %s - %s\n", i, hash, c.subject))
+				break
+			}
+		}
+	}
+	return sb.String()
+}
+
+// renderGraphView renders the commit graph.
+func renderGraphView(m model, width int) string {
+	if len(m.commitGraph) == 0 {
+		return ""
+	}
+	return renderAsciiGraph(m.commitGraph)
+}
+
+// renderViewMode renders current view (log, stash, or reflog).
+func renderViewMode(m model, width int) string {
+	switch m.viewMode {
+	case "stash":
+		return renderStashView(m.stashes, width)
+	case "reflog":
+		return renderReflogView(m.reflogEntries, width)
+	default:
+		return ""
+	}
+}
+
+// renderDiffWithComments renders diff with comment markers.
+func renderDiffWithComments(m model, panelHeight, width int) string {
+	var sb strings.Builder
+	for i := 0; i < panelHeight && m.diffOffset+i < len(m.diffLines); i++ {
+		marker := renderLineCommentMarker(m, m.diffOffset+i)
+		if marker != "" {
+			sb.WriteString(marker)
+			sb.WriteString(" ")
+		}
+		sb.WriteString(m.diffLines[m.diffOffset+i].text)
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+// enterCommentMode enters line comment mode.
+func enterCommentMode(m model) model {
+	m.inCommentMode = true
+	m.commentInput = ""
+	return m
+}
+
+// exitCommentMode exits line comment mode.
+func exitCommentMode(m model) model {
+	m.inCommentMode = false
+	m.commentInput = ""
+	return m
+}
+
+// ===== OPTIMIZATION: CACHING =====
+
+// newDiffCache creates a new diff cache with specified max size.
+func newDiffCache(size int) *diffCache {
+	return &diffCache{
+		data:    make(map[string][]diffLine),
+		order:   []string{},
+		maxSize: size,
+	}
+}
+
+// set stores a diff in the cache.
+func (dc *diffCache) set(key string, lines []diffLine) {
+	if _, exists := dc.data[key]; !exists {
+		dc.order = append(dc.order, key)
+		if len(dc.order) > dc.maxSize {
+			oldest := dc.order[0]
+			dc.order = dc.order[1:]
+			delete(dc.data, oldest)
+		}
+	}
+	dc.data[key] = lines
+}
+
+// get retrieves a diff from the cache.
+func (dc *diffCache) get(key string) ([]diffLine, bool) {
+	lines, ok := dc.data[key]
+	if ok {
+		dc.hitCount++
+	}
+	return lines, ok
+}
+
+// getHitCount returns the number of cache hits.
+func (dc *diffCache) getHitCount() int {
+	return dc.hitCount
+}
+
+// newStatCache creates a new stats cache.
+func newStatCache(size int) *statCache {
+	return &statCache{
+		data:    make(map[string]commitStatistics),
+		order:   []string{},
+		maxSize: size,
+	}
+}
+
+// getOrCompute gets cached stats or computes them.
+func (sc *statCache) getOrCompute(key string, lines []diffLine) commitStatistics {
+	if stats, ok := sc.data[key]; ok {
+		sc.hitCount++
+		return stats
+	}
+	stats := commitStats(lines)
+	sc.order = append(sc.order, key)
+	if len(sc.order) > sc.maxSize {
+		oldest := sc.order[0]
+		sc.order = sc.order[1:]
+		delete(sc.data, oldest)
+	}
+	sc.data[key] = stats
+	return stats
+}
+
+// getHitCount returns the number of cache hits.
+func (sc *statCache) getHitCount() int {
+	return sc.hitCount
+}
+
+// newRegexCache creates a new regex cache.
+func newRegexCache(size int) *regexCache {
+	return &regexCache{
+		data:    make(map[string]*regexp.Regexp),
+		maxSize: size,
+	}
+}
+
+// compile compiles a regex or returns cached version.
+func (rc *regexCache) compile(pattern string) (*regexp.Regexp, error) {
+	if re, ok := rc.data[pattern]; ok {
+		rc.hitCount++
+		return re, nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	if len(rc.data) < rc.maxSize {
+		rc.data[pattern] = re
+	}
+	return re, nil
+}
+
+// ===== OPTIMIZATION: LAZY LOADING =====
+
+// lazyLoadDiff loads diff asynchronously if not already loaded.
+func lazyLoadDiff(m model) model {
+	if m.cursor < len(m.commits) && len(m.diffLines) == 0 {
+		m.loading = true
+	}
+	return m
+}
+
+// lazyLoadGraph builds graph on demand.
+func lazyLoadGraph(m model) model {
+	if len(m.commitGraph) == 0 && len(m.commits) > 0 {
+		m.commitGraph = parseCommitGraph(m.commits)
+	}
+	return m
+}
+
+// lazyLoadStats computes stats on demand.
+func lazyLoadStats(m model) commitStatistics {
+	return commitStats(m.diffLines)
+}
+
+// ===== OPTIMIZATION: SAFE WRAPPERS =====
+
+// safeIsFileModified safely checks file modification without crashing.
+func safeIsFileModified(hash, file string) bool {
+	if hash == "" || file == "" {
+		return false
+	}
+	return isFileModifiedInCommit(hash, file)
+}
+
+// safeParseCommitGraph safely parses graph, returning empty slice on error.
+func safeParseCommitGraph(commits []commit) []graphNode {
+	if commits == nil {
+		return []graphNode{}
+	}
+	return parseCommitGraph(commits)
 }

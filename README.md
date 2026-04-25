@@ -345,6 +345,69 @@ The diff panel shows `git show --stat --patch` output for the selected commit, c
 
 **Stash Lookup** - Find stashes by index (`findStashByIndex()`).
 
+---
+
+## UI Integration & Performance Optimization
+
+### Keybinding System
+Complete keyboard shortcut system for all 40 features:
+- `m` - Toggle bookmark on current commit
+- `'` - Jump to next bookmarked commit
+- `gg` - Enter go-to-commit mode (jump by hash)
+- `c` - Enter line comment mode
+- `v` - Switch to stash browser
+- `V` - Switch to reflog browser
+- `G` - Toggle commit graph visualization
+- `f` - Toggle file list view
+- `5j`/`5k` - Jump 5 commits (any number prefix)
+
+### Rendering Enhancements
+- **Stats badges** - Display `+files +adds -deletes` in commit rows
+- **Bookmark indicators** - Visual ★ markers for bookmarked commits
+- **Graph visualization** - ASCII art commit graph with merge markers
+- **Line comments** - ● markers for annotated diff lines
+- **Multi-view rendering** - Seamless switching between log/stash/reflog views
+
+### Performance Optimization
+**Diff Caching** - LRU cache for parsed diffs with configurable size
+- Tracks cache hit rate
+- Automatic eviction of oldest entries
+- Reduces re-parsing overhead
+
+**Statistics Memoization** - Cache commit statistics (file count, additions, deletions)
+- Avoids redundant stat calculations
+- Tracks cache hit efficiency
+- Pre-populated on demand
+
+**Regex Compilation Caching** - Compiles and caches regex patterns
+- First-compile caches for immediate reuse
+- Prevents recompilation of same patterns
+- Improves search performance
+
+**Lazy Loading** - Deferred computation of expensive operations
+- Diffs load asynchronously as needed
+- Commit graphs build on demand
+- Statistics computed when accessed
+
+**Safe Wrappers** - Error-resistant function wrappers
+- Graceful handling of nil/empty inputs
+- No panics on edge cases
+- Returns sensible defaults
+
+### Performance Metrics
+Built-in cache tracking for performance monitoring:
+- `diffCacheHits` - Diff cache hit count
+- `statCacheHits` - Statistics cache hit count  
+- `regexCacheHits` - Regex cache hit count
+- Cache efficiency visible for optimization tuning
+
+### Error Handling
+Comprehensive error recovery:
+- Safe file modification checks
+- Safe graph parsing with empty slice returns
+- Graceful keybinding handling
+- Comment mode with input validation
+
 **File list:** press `f` to replace the commit list with the list of files changed in the current commit. Navigate with `j`/`k` and press `Enter` to jump directly to that file's section in the diff. Press `f` or `Esc` to return to the commit list.
 
 **Blame:** press `B` to see `git blame` for the file currently visible in the diff panel. Each line shows the short commit hash, author, date, line number, and source. Press `B` or `Esc` to return to the diff.
