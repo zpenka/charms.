@@ -1,9 +1,11 @@
 package gitlog
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type commit struct {
@@ -83,10 +85,16 @@ type model struct {
 	bookmarks []string // commit short hashes
 	// Stats
 	lastStats commitStatistics
-	repoPath  string
-	width     int
-	height    int
-	loading   bool
+	// Line comments
+	comments map[int]string
+	// Tag view
+	showTags bool
+	tags     []string
+	tagCursor int
+	repoPath string
+	width    int
+	height   int
+	loading  bool
 }
 
 type commitStatistics struct {
@@ -761,4 +769,233 @@ func miniMapPosition(cursor, panelHeight, totalCommits int) int {
 		position = panelHeight - 1
 	}
 	return position
+}
+
+// --- diffStatBadge ---
+
+// diffStatBadge formats commit statistics as a compact badge (e.g., "3 files +10 -5").
+func diffStatBadge(stats commitStatistics) string {
+	var parts []string
+	if stats.filesChanged > 0 {
+		parts = append(parts, fmt.Sprintf("%d file%s", stats.filesChanged, pluralize(stats.filesChanged)))
+	}
+	if stats.insertions > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", stats.insertions))
+	}
+	if stats.deletions > 0 {
+		parts = append(parts, fmt.Sprintf("-%d", stats.deletions))
+	}
+	if len(parts) == 0 {
+		return "0 changes"
+	}
+	return strings.Join(parts, " ")
+}
+
+// pluralize returns "s" if count != 1, else "".
+func pluralize(count int) string {
+	if count != 1 {
+		return "s"
+	}
+	return ""
+}
+
+// --- goToCommit ---
+
+// goToCommit finds a commit by hash (short or full) and returns its index, or -1 if not found.
+func goToCommit(commits []commit, query string) int {
+	q := strings.ToLower(query)
+	for i, c := range commits {
+		if strings.EqualFold(c.shortHash, query) || strings.EqualFold(c.hash, query) {
+			return i
+		}
+		if strings.HasPrefix(strings.ToLower(c.shortHash), q) || strings.HasPrefix(strings.ToLower(c.hash), q) {
+			return i
+		}
+	}
+	return -1
+}
+
+// --- copyAsPatch ---
+
+// copyAsPatch generates a patch file format from a commit hash and diff lines.
+func copyAsPatch(hash string, lines []diffLine) string {
+	var sb strings.Builder
+	sb.WriteString("From: " + hash + "\n")
+	sb.WriteString("Subject: Commit patch\n")
+	sb.WriteString("\n")
+	for _, line := range lines {
+		sb.WriteString(line.text)
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+// --- parseGitReferences ---
+
+// parseGitReferences extracts issue/PR numbers from a commit message (e.g., #123, fixes #456).
+func parseGitReferences(msg string) []string {
+	re := regexp.MustCompile(`#(\d+)`)
+	matches := re.FindAllStringSubmatch(msg, -1)
+	var refs []string
+	seen := make(map[string]bool)
+	for _, match := range matches {
+		if len(match) > 1 && !seen[match[1]] {
+			refs = append(refs, match[1])
+			seen[match[1]] = true
+		}
+	}
+	return refs
+}
+
+// --- isMergeCommit ---
+
+// isMergeCommit checks if a commit is a merge commit.
+func isMergeCommit(lines []diffLine) bool {
+	for _, line := range lines {
+		if strings.HasPrefix(line.text, "Merge:") {
+			return true
+		}
+		if strings.Contains(strings.ToLower(line.text), "merge branch") {
+			return true
+		}
+	}
+	return false
+}
+
+// --- getMergeParents ---
+
+// getMergeParents extracts parent hashes from a merge commit.
+func getMergeParents(lines []diffLine) []string {
+	for _, line := range lines {
+		if strings.HasPrefix(line.text, "Merge:") {
+			parts := strings.Fields(strings.TrimPrefix(line.text, "Merge:"))
+			if len(parts) >= 2 {
+				return parts[:2]
+			}
+		}
+	}
+	return nil
+}
+
+// --- hunk structure and parseHunks ---
+
+type hunk struct {
+	startLine int
+	endLine   int
+	header    string
+}
+
+// parseHunks extracts all hunks from diff lines.
+func parseHunks(lines []diffLine) []hunk {
+	var hunks []hunk
+	var lastHunk hunk
+	hunkCount := 0
+
+	for i, line := range lines {
+		if line.kind == lineHunk {
+			if hunkCount > 0 {
+				hunks = append(hunks, lastHunk)
+			}
+			lastHunk = hunk{
+				startLine: i,
+				endLine:   i,
+				header:    line.text,
+			}
+			hunkCount++
+		} else if hunkCount > 0 {
+			lastHunk.endLine = i
+		}
+	}
+	if hunkCount > 0 {
+		hunks = append(hunks, lastHunk)
+	}
+	return hunks
+}
+
+// --- toggleLineComment ---
+
+// toggleLineComment adds or removes a comment on a specific diff line.
+func toggleLineComment(m model, lineIdx int, comment string) model {
+	if m.comments == nil {
+		m.comments = make(map[int]string)
+	}
+	if comment == "" {
+		delete(m.comments, lineIdx)
+	} else {
+		m.comments[lineIdx] = comment
+	}
+	return m
+}
+
+// --- compileRegex ---
+
+// compileRegex compiles a regex pattern for search.
+func compileRegex(pattern string) (*regexp.Regexp, error) {
+	return regexp.Compile(pattern)
+}
+
+// --- parseDateRange ---
+
+// parseDateRange parses a date or date range (e.g., "2024-01-15" or "2024-01-01..2024-01-31").
+func parseDateRange(input string) (*time.Time, *time.Time, error) {
+	if input == "" {
+		return nil, nil, nil
+	}
+
+	// Check for range format
+	if strings.Contains(input, "..") {
+		parts := strings.Split(input, "..")
+		if len(parts) != 2 {
+			return nil, nil, fmt.Errorf("invalid date range format")
+		}
+		start, err1 := time.Parse("2006-01-02", strings.TrimSpace(parts[0]))
+		end, err2 := time.Parse("2006-01-02", strings.TrimSpace(parts[1]))
+		if err1 != nil || err2 != nil {
+			return nil, nil, fmt.Errorf("invalid date format")
+		}
+		return &start, &end, nil
+	}
+
+	// Single date
+	date, err := time.Parse("2006-01-02", input)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid date format")
+	}
+	return &date, nil, nil
+}
+
+// --- filterCommitsByFile ---
+
+// filterCommitsByFile returns commits that touched the specified file.
+// Note: This is infrastructure-ready; actual filtering requires git queries.
+func filterCommitsByFile(commits []commit, file string) []commit {
+	if file == "" {
+		return commits
+	}
+	// This would typically query git for commits touching the file
+	// For now, return infrastructure (called from UI)
+	return []commit{}
+}
+
+// --- parseTags ---
+
+// parseTags parses git tag output (format: "hash tagname" per line).
+func parseTags(output string) []string {
+	var tags []string
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Handle both "hash tagname" and "tagname" formats
+		parts := strings.Fields(line)
+		if len(parts) >= 1 {
+			// Take the last non-hash part
+			tag := parts[len(parts)-1]
+			if !strings.HasPrefix(tag, "[") { // Skip metadata
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
 }

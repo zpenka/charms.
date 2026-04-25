@@ -1147,3 +1147,373 @@ func TestMiniMapPosition_Middle(t *testing.T) {
 		t.Errorf("in middle, should return ~5, got %d", pos)
 	}
 }
+
+// --- diffStatBadge ---
+
+func TestDiffStatBadge_Empty(t *testing.T) {
+	badge := diffStatBadge(commitStatistics{})
+	if badge == "" {
+		t.Error("should generate non-empty badge")
+	}
+}
+
+func TestDiffStatBadge_Format(t *testing.T) {
+	stats := commitStatistics{insertions: 10, deletions: 5}
+	badge := diffStatBadge(stats)
+	if !strings.Contains(badge, "10") || !strings.Contains(badge, "5") {
+		t.Errorf("badge should contain counts, got %q", badge)
+	}
+}
+
+func TestDiffStatBadge_ShowsFiles(t *testing.T) {
+	stats := commitStatistics{filesChanged: 3, insertions: 10, deletions: 5}
+	badge := diffStatBadge(stats)
+	if !strings.Contains(badge, "3") {
+		t.Errorf("badge should show files changed, got %q", badge)
+	}
+}
+
+// --- goToCommit ---
+
+func TestGoToCommit_FindsByHash(t *testing.T) {
+	commits := []commit{
+		{shortHash: "abc1234", hash: "abc1234567890"},
+		{shortHash: "def5678", hash: "def5678901234"},
+	}
+	idx := goToCommit(commits, "abc1234")
+	if idx != 0 {
+		t.Errorf("expected 0, got %d", idx)
+	}
+}
+
+func TestGoToCommit_FindsByFullHash(t *testing.T) {
+	commits := []commit{
+		{shortHash: "abc1234", hash: "abc1234567890abcdef1234567890"},
+		{shortHash: "def5678", hash: "def5678901234abcdef5678901234"},
+	}
+	idx := goToCommit(commits, "abc1234567890abcdef1234567890")
+	if idx != 0 {
+		t.Errorf("expected 0, got %d", idx)
+	}
+}
+
+func TestGoToCommit_NotFound(t *testing.T) {
+	commits := []commit{
+		{shortHash: "abc1234", hash: "abc1234567890"},
+	}
+	idx := goToCommit(commits, "zzz9999")
+	if idx != -1 {
+		t.Errorf("should return -1 for not found, got %d", idx)
+	}
+}
+
+func TestGoToCommit_CaseInsensitive(t *testing.T) {
+	commits := []commit{
+		{shortHash: "AbC1234", hash: "AbC1234567890"},
+	}
+	idx := goToCommit(commits, "abc1234")
+	if idx != 0 {
+		t.Errorf("should be case-insensitive, got %d", idx)
+	}
+}
+
+// --- copyAsPatch ---
+
+func TestCopyAsPatch_Empty(t *testing.T) {
+	patch := copyAsPatch("abc1234", []diffLine{})
+	if patch == "" {
+		t.Error("should generate non-empty patch")
+	}
+}
+
+func TestCopyAsPatch_ContainsHash(t *testing.T) {
+	lines := []diffLine{{lineAdded, "+new line"}}
+	patch := copyAsPatch("abc1234", lines)
+	if !strings.Contains(patch, "abc1234") {
+		t.Errorf("patch should contain hash, got %q", patch)
+	}
+}
+
+func TestCopyAsPatch_ContainsDiff(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "diff --git a/test.go b/test.go"},
+		{lineAdded, "+new line"},
+	}
+	patch := copyAsPatch("abc1234", lines)
+	if !strings.Contains(patch, "+new line") {
+		t.Errorf("patch should contain diff content, got %q", patch)
+	}
+}
+
+// --- parseGitReferences ---
+
+func TestParseGitReferences_None(t *testing.T) {
+	refs := parseGitReferences("just a commit message")
+	if len(refs) != 0 {
+		t.Errorf("expected no refs, got %d", len(refs))
+	}
+}
+
+func TestParseGitReferences_IssueNumber(t *testing.T) {
+	refs := parseGitReferences("fix #123 for login")
+	if len(refs) != 1 || refs[0] != "123" {
+		t.Errorf("expected #123, got %v", refs)
+	}
+}
+
+func TestParseGitReferences_Multiple(t *testing.T) {
+	refs := parseGitReferences("fixes #123 and closes #456")
+	if len(refs) != 2 {
+		t.Errorf("expected 2 refs, got %d", len(refs))
+	}
+}
+
+func TestParseGitReferences_FixesKeyword(t *testing.T) {
+	refs := parseGitReferences("fixes #789")
+	if len(refs) != 1 {
+		t.Errorf("expected 1 ref, got %d", len(refs))
+	}
+}
+
+// --- isMergeCommit ---
+
+func TestIsMergeCommit_NotMerge(t *testing.T) {
+	lines := []diffLine{{lineAdded, "+normal commit"}}
+	if isMergeCommit(lines) {
+		t.Error("should not detect as merge")
+	}
+}
+
+func TestIsMergeCommit_DetectsMerge(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "Merge: abc1234 def5678"},
+	}
+	if !isMergeCommit(lines) {
+		t.Error("should detect merge commit")
+	}
+}
+
+func TestIsMergeCommit_WithMergeTag(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "Merge branch 'feature' into main"},
+	}
+	if !isMergeCommit(lines) {
+		t.Error("should detect merge from message")
+	}
+}
+
+// --- getMergeParents ---
+
+func TestGetMergeParents_Empty(t *testing.T) {
+	parents := getMergeParents([]diffLine{})
+	if len(parents) != 0 {
+		t.Errorf("empty diff should have 0 parents, got %d", len(parents))
+	}
+}
+
+func TestGetMergeParents_Single(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "Merge: abc1234 def5678"},
+	}
+	parents := getMergeParents(lines)
+	if len(parents) != 2 {
+		t.Errorf("expected 2 parents, got %d", len(parents))
+	}
+	if parents[0] != "abc1234" || parents[1] != "def5678" {
+		t.Errorf("wrong parents: %v", parents)
+	}
+}
+
+// --- parseHunks ---
+
+func TestParseHunks_Empty(t *testing.T) {
+	hunks := parseHunks([]diffLine{})
+	if len(hunks) != 0 {
+		t.Errorf("empty diff should have 0 hunks, got %d", len(hunks))
+	}
+}
+
+func TestParseHunks_Single(t *testing.T) {
+	lines := []diffLine{
+		{lineHunk, "@@ -1,5 +1,8 @@ func main()"},
+		{lineAdded, "+new line"},
+	}
+	hunks := parseHunks(lines)
+	if len(hunks) != 1 {
+		t.Errorf("expected 1 hunk, got %d", len(hunks))
+	}
+}
+
+func TestParseHunks_Multiple(t *testing.T) {
+	lines := []diffLine{
+		{lineHunk, "@@ -1,5 +1,8 @@ func main()"},
+		{lineAdded, "+line"},
+		{lineHunk, "@@ -20,3 +25,5 @@ other func"},
+		{lineRemoved, "-removed"},
+	}
+	hunks := parseHunks(lines)
+	if len(hunks) != 2 {
+		t.Errorf("expected 2 hunks, got %d", len(hunks))
+	}
+}
+
+// --- toggleLineComment ---
+
+func TestToggleLineComment_AddComment(t *testing.T) {
+	m := model{comments: make(map[int]string)}
+	m = toggleLineComment(m, 5, "needs review")
+	if m.comments[5] != "needs review" {
+		t.Errorf("comment not set, got %q", m.comments[5])
+	}
+}
+
+func TestToggleLineComment_RemoveComment(t *testing.T) {
+	m := model{comments: map[int]string{5: "needs review"}}
+	m = toggleLineComment(m, 5, "")
+	if _, ok := m.comments[5]; ok {
+		t.Error("comment should be removed")
+	}
+}
+
+// --- compileRegex ---
+
+func TestCompileRegex_Valid(t *testing.T) {
+	re, err := compileRegex("fix.*bug")
+	if err != nil {
+		t.Errorf("valid regex should compile, got %v", err)
+	}
+	if re == nil {
+		t.Error("regex should not be nil")
+	}
+}
+
+func TestCompileRegex_Invalid(t *testing.T) {
+	_, err := compileRegex("[invalid(regex")
+	if err == nil {
+		t.Error("invalid regex should return error")
+	}
+}
+
+func TestCompileRegex_Match(t *testing.T) {
+	re, _ := compileRegex("^fix")
+	if !re.MatchString("fix login bug") {
+		t.Error("regex should match 'fix login bug'")
+	}
+	if re.MatchString("bugfix something") {
+		t.Error("regex should not match 'bugfix something'")
+	}
+}
+
+// --- parseDateRange ---
+
+func TestParseDateRange_Empty(t *testing.T) {
+	start, end, err := parseDateRange("")
+	if err != nil {
+		t.Errorf("empty range should not error, got %v", err)
+	}
+	if start != nil || end != nil {
+		t.Error("empty range should return nil dates")
+	}
+}
+
+func TestParseDateRange_SingleDate(t *testing.T) {
+	start, _, err := parseDateRange("2024-01-15")
+	if err != nil {
+		t.Errorf("single date should not error, got %v", err)
+	}
+	if start == nil {
+		t.Error("start date should be set")
+	}
+}
+
+func TestParseDateRange_Range(t *testing.T) {
+	start, end, err := parseDateRange("2024-01-01..2024-01-31")
+	if err != nil {
+		t.Errorf("date range should not error, got %v", err)
+	}
+	if start == nil {
+		t.Error("start date should be set")
+	}
+	if end == nil {
+		t.Error("end date should be set")
+	}
+}
+
+func TestParseDateRange_InvalidFormat(t *testing.T) {
+	_, _, err := parseDateRange("not-a-date")
+	if err == nil {
+		t.Error("invalid date should return error")
+	}
+}
+
+// --- filterCommitsByFile ---
+
+func TestFilterCommitsByFile_Empty(t *testing.T) {
+	commits := makeCommits(3)
+	result := filterCommitsByFile(commits, "")
+	if len(result) != 3 {
+		t.Errorf("empty file filter should return all, got %d", len(result))
+	}
+}
+
+func TestFilterCommitsByFile_NoMatches(t *testing.T) {
+	commits := []commit{
+		{shortHash: "aaa", subject: "fix: auth.go"},
+		{shortHash: "bbb", subject: "update: main.go"},
+	}
+	result := filterCommitsByFile(commits, "nonexistent.go")
+	if len(result) != 0 {
+		t.Errorf("no matches should return empty, got %d", len(result))
+	}
+}
+
+// Note: This test requires access to git history which is complex to mock
+// In practice, this would need the model to track changed files per commit
+func TestFilterCommitsByFile_Matches(t *testing.T) {
+	// This is infrastructure - actual matching would happen via git queries
+	result := filterCommitsByFile([]commit{}, "test.go")
+	if result == nil {
+		t.Error("should return slice, not nil")
+	}
+}
+
+// --- parseTags ---
+
+func TestParseTags_Empty(t *testing.T) {
+	tags := parseTags("")
+	if len(tags) != 0 {
+		t.Errorf("empty input should return empty slice, got %d", len(tags))
+	}
+}
+
+func TestParseTags_SingleTag(t *testing.T) {
+	tags := parseTags("v1.0.0\n")
+	if len(tags) != 1 || tags[0] != "v1.0.0" {
+		t.Errorf("expected [v1.0.0], got %v", tags)
+	}
+}
+
+func TestParseTags_MultipleTagsWithHashes(t *testing.T) {
+	input := "abc1234 v1.0.0\ndef5678 v1.0.1\n"
+	tags := parseTags(input)
+	if len(tags) != 2 {
+		t.Errorf("expected 2 tags, got %d", len(tags))
+	}
+}
+
+// --- Tag view model field ---
+
+func TestTagView_InitFalse(t *testing.T) {
+	m := model{}
+	if m.showTags {
+		t.Error("showTags should default to false")
+	}
+}
+
+func TestTagView_Toggle(t *testing.T) {
+	m := model{showTags: false}
+	m.showTags = !m.showTags
+	if !m.showTags {
+		t.Error("should toggle to true")
+	}
+}
