@@ -8,6 +8,7 @@ import (
 
 	"charms/chess"
 	game2048 "charms/game2048"
+	"charms/gitlog"
 	"charms/snake"
 	"charms/tapper"
 
@@ -58,6 +59,12 @@ var games = []game{
 		desc:     "slide tiles, merge numbers, reach 2048",
 		run:      game2048.Run,
 		topScore: game2048.TopScore,
+	},
+	{
+		name:     "Git Log",
+		desc:     "browse commits and diffs for the current repo",
+		run:      gitlog.Run,
+		topScore: func() string { return "—" },
 	},
 }
 
