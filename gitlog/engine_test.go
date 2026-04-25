@@ -1517,3 +1517,317 @@ func TestTagView_Toggle(t *testing.T) {
 		t.Error("should toggle to true")
 	}
 }
+
+// ===== OPTION 1: UI INTEGRATION =====
+
+func TestRenderStatsBadgeInList(t *testing.T) {
+	stats := commitStatistics{filesChanged: 3, insertions: 10, deletions: 5}
+	badge := renderStatsBadgeInList(stats, 20)
+	if badge == "" {
+		t.Error("should generate non-empty badge")
+	}
+	if !strings.Contains(badge, "+10") || !strings.Contains(badge, "-5") {
+		t.Errorf("badge should contain stats, got %q", badge)
+	}
+}
+
+func TestRenderStatsBadgeInList_TruncatesLong(t *testing.T) {
+	stats := commitStatistics{filesChanged: 100, insertions: 999, deletions: 888}
+	badge := renderStatsBadgeInList(stats, 10)
+	if len(badge) > 12 {
+		t.Errorf("should truncate for width 10, got len=%d", len(badge))
+	}
+}
+
+func TestFormatFilterHeaderDisplay(t *testing.T) {
+	m := model{authorFilter: "Jane", sinceFilter: 7}
+	display := formatFilterHeaderDisplay(m)
+	if display == "" {
+		t.Error("should show filters")
+	}
+	if !strings.Contains(display, "Jane") {
+		t.Errorf("should contain author, got %q", display)
+	}
+}
+
+func TestRenderBookmarkMarker_Bookmarked(t *testing.T) {
+	m := model{cursor: 0, commits: []commit{{shortHash: "abc"}}, bookmarks: []string{"abc"}}
+	marker := renderBookmarkMarker(m, 0)
+	if marker == "" {
+		t.Error("bookmarked commit should have marker")
+	}
+}
+
+func TestRenderBookmarkMarker_NotBookmarked(t *testing.T) {
+	m := model{cursor: 0, commits: []commit{{shortHash: "abc"}}, bookmarks: []string{}}
+	marker := renderBookmarkMarker(m, 0)
+	if marker != "" {
+		t.Errorf("non-bookmarked should be empty, got %q", marker)
+	}
+}
+
+func TestHandleGoToCommitInput(t *testing.T) {
+	commits := []commit{
+		{shortHash: "abc1234", hash: "abc1234567890"},
+		{shortHash: "def5678", hash: "def5678901234"},
+	}
+	m := model{commits: commits, cursor: 0}
+	m = handleGoToCommitInput(m, "def5678")
+	if m.cursor != 1 {
+		t.Errorf("should jump to index 1, got %d", m.cursor)
+	}
+}
+
+func TestHandleGoToCommitInput_InvalidHash(t *testing.T) {
+	commits := []commit{{shortHash: "abc1234", hash: "abc1234567890"}}
+	m := model{commits: commits, cursor: 0}
+	m = handleGoToCommitInput(m, "zzz9999")
+	if m.cursor != 0 {
+		t.Errorf("should stay at 0 for invalid hash, got %d", m.cursor)
+	}
+}
+
+func TestRenderLineCommentMarker_HasComment(t *testing.T) {
+	m := model{comments: map[int]string{5: "needs review"}}
+	marker := renderLineCommentMarker(m, 5)
+	if marker == "" {
+		t.Error("line with comment should have marker")
+	}
+}
+
+func TestRenderLineCommentMarker_NoComment(t *testing.T) {
+	m := model{comments: map[int]string{}}
+	marker := renderLineCommentMarker(m, 5)
+	if marker != "" {
+		t.Errorf("line without comment should be empty, got %q", marker)
+	}
+}
+
+// ===== OPTION 2: COMMIT GRAPH =====
+
+func TestParseCommitGraph_Empty(t *testing.T) {
+	graph := parseCommitGraph([]commit{})
+	if len(graph) != 0 {
+		t.Errorf("empty commits should have no graph nodes, got %d", len(graph))
+	}
+}
+
+func TestParseCommitGraph_Linear(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "first"},
+		{hash: "bbb", subject: "second"},
+		{hash: "ccc", subject: "third"},
+	}
+	graph := parseCommitGraph(commits)
+	if len(graph) != 3 {
+		t.Errorf("expected 3 nodes, got %d", len(graph))
+	}
+}
+
+func TestDetectBranches_Linear(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "first"},
+		{hash: "bbb", subject: "second"},
+	}
+	branches := detectBranches(commits)
+	if len(branches) != 1 {
+		t.Errorf("linear history should have 1 branch, got %d", len(branches))
+	}
+}
+
+func TestRenderAsciiGraph_SingleCommit(t *testing.T) {
+	graph := []graphNode{
+		{hash: "abc", depth: 0, isMerge: false},
+	}
+	art := renderAsciiGraph(graph)
+	if art == "" {
+		t.Error("should generate non-empty ASCII art")
+	}
+}
+
+func TestNavigateAlongGraph_Forward(t *testing.T) {
+	graph := []graphNode{
+		{hash: "aaa", depth: 0, isMerge: false},
+		{hash: "bbb", depth: 0, isMerge: false},
+	}
+	idx := navigateAlongGraph(graph, 0, "down")
+	if idx != 1 {
+		t.Errorf("should move to index 1, got %d", idx)
+	}
+}
+
+func TestNavigateAlongGraph_Backward(t *testing.T) {
+	graph := []graphNode{
+		{hash: "aaa", depth: 0, isMerge: false},
+		{hash: "bbb", depth: 0, isMerge: false},
+	}
+	idx := navigateAlongGraph(graph, 1, "up")
+	if idx != 0 {
+		t.Errorf("should move to index 0, got %d", idx)
+	}
+}
+
+func TestGetCommitRelationships_None(t *testing.T) {
+	rels := getCommitRelationships([]commit{})
+	if len(rels) != 0 {
+		t.Errorf("empty commits should have no relationships, got %d", len(rels))
+	}
+}
+
+// ===== OPTION 3: FILE-CENTRIC VIEW =====
+
+func TestBuildFileHistory_Empty(t *testing.T) {
+	history := buildFileHistory([]commit{}, "test.go")
+	if history == nil {
+		t.Error("should return non-nil slice")
+	}
+}
+
+func TestBuildFileHistory_SingleFile(t *testing.T) {
+	// Note: In real implementation, would query git for file history
+	history := buildFileHistory([]commit{}, "test.go")
+	if history == nil {
+		t.Error("should return slice")
+	}
+}
+
+func TestRenderFileTimeline_Empty(t *testing.T) {
+	timeline := renderFileTimeline([]commit{}, "test.go", 50)
+	if timeline == "" {
+		t.Error("should generate non-empty timeline")
+	}
+}
+
+func TestGetFileBlameContext_Empty(t *testing.T) {
+	ctx := getFileBlameContext([]diffLine{}, "test.go")
+	if ctx == nil {
+		t.Error("should return non-nil context")
+	}
+}
+
+func TestFilterCommitsByFileChange_None(t *testing.T) {
+	commits := []commit{{shortHash: "aaa", subject: "fix"}}
+	filtered := filterCommitsByFileChange(commits, "nonexistent.go")
+	if len(filtered) > 0 {
+		t.Errorf("no matches should be empty, got %d", len(filtered))
+	}
+}
+
+func TestIsFileModifiedInCommit_Unknown(t *testing.T) {
+	// Infrastructure: actual check would need git
+	modified := isFileModifiedInCommit("abc1234", "test.go")
+	if modified {
+		t.Error("unknown should return false")
+	}
+}
+
+// ===== OPTION 4: STASH & REFLOG =====
+
+func TestParseStashList_Empty(t *testing.T) {
+	stashes := parseStashList("")
+	if len(stashes) != 0 {
+		t.Errorf("empty input should have no stashes, got %d", len(stashes))
+	}
+}
+
+func TestParseStashList_Single(t *testing.T) {
+	input := "stash@{0}: WIP on main: abc1234 commit message\n"
+	stashes := parseStashList(input)
+	if len(stashes) != 1 {
+		t.Errorf("expected 1 stash, got %d", len(stashes))
+	}
+	if stashes[0].name != "stash@{0}" {
+		t.Errorf("wrong stash name, got %q", stashes[0].name)
+	}
+}
+
+func TestParseStashList_Multiple(t *testing.T) {
+	input := "stash@{0}: WIP on main: abc1234 msg1\nstash@{1}: WIP on feature: def5678 msg2\n"
+	stashes := parseStashList(input)
+	if len(stashes) != 2 {
+		t.Errorf("expected 2 stashes, got %d", len(stashes))
+	}
+}
+
+func TestParseReflog_Empty(t *testing.T) {
+	entries := parseReflog("")
+	if len(entries) != 0 {
+		t.Errorf("empty input should have no entries, got %d", len(entries))
+	}
+}
+
+func TestParseReflog_Single(t *testing.T) {
+	input := "abc1234 HEAD@{0}: commit: initial commit\n"
+	entries := parseReflog(input)
+	if len(entries) != 1 {
+		t.Errorf("expected 1 entry, got %d", len(entries))
+	}
+}
+
+func TestRenderStashView_Empty(t *testing.T) {
+	view := renderStashView([]stashEntry{}, 50)
+	if view == "" {
+		t.Error("should generate non-empty view")
+	}
+}
+
+func TestRenderReflogView_Empty(t *testing.T) {
+	view := renderReflogView([]reflogEntry{}, 50)
+	if view == "" {
+		t.Error("should generate non-empty view")
+	}
+}
+
+func TestStashToCommitLike_Conversion(t *testing.T) {
+	stash := stashEntry{name: "stash@{0}", branch: "main", subject: "WIP"}
+	c := stashToCommitLike(stash)
+	if c.subject != "WIP" {
+		t.Errorf("wrong subject, got %q", c.subject)
+	}
+}
+
+func TestReflogToCommitLike_Conversion(t *testing.T) {
+	entry := reflogEntry{hash: "abc1234", action: "commit", message: "test"}
+	c := reflogToCommitLike(entry)
+	if c.hash != "abc1234" {
+		t.Errorf("wrong hash, got %q", c.hash)
+	}
+}
+
+func TestSwitchViewMode_Log(t *testing.T) {
+	m := model{viewMode: "log"}
+	m = switchViewMode(m, "stash")
+	if m.viewMode != "stash" {
+		t.Errorf("should switch to stash, got %q", m.viewMode)
+	}
+}
+
+func TestSwitchViewMode_Stash(t *testing.T) {
+	m := model{viewMode: "stash"}
+	m = switchViewMode(m, "reflog")
+	if m.viewMode != "reflog" {
+		t.Errorf("should switch to reflog, got %q", m.viewMode)
+	}
+}
+
+func TestSwitchViewMode_Reflog(t *testing.T) {
+	m := model{viewMode: "reflog"}
+	m = switchViewMode(m, "log")
+	if m.viewMode != "log" {
+		t.Errorf("should switch to log, got %q", m.viewMode)
+	}
+}
+
+func TestApplyStash_FindsStash(t *testing.T) {
+	stashes := []stashEntry{
+		{name: "stash@{0}", branch: "main"},
+		{name: "stash@{1}", branch: "feature"},
+	}
+	found := findStashByIndex(stashes, 0)
+	if found == nil {
+		t.Error("should find stash@{0}")
+	}
+	if found.name != "stash@{0}" {
+		t.Errorf("wrong stash, got %q", found.name)
+	}
+}

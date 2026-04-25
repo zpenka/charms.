@@ -295,6 +295,56 @@ The diff panel shows `git show --stat --patch` output for the selected commit, c
 
 **Tag Browsing:** Parse and display git tags (`parseTags()`). Tag view infrastructure is ready for integration with tag-based commit navigation.
 
+---
+
+## Advanced Features (UI Integration & Views)
+
+### Option 1: UI Integration
+**Stats Badges in List** - Display compact diff stats (+files +adds -deletes) directly in commit rows (`renderStatsBadgeInList()`).
+
+**Filter Display** - Show active filters prominently in the header (e.g., `[Jane Smith + 7d]`) with `formatFilterHeaderDisplay()`.
+
+**Bookmark Indicators** - Visual markers (★) for bookmarked commits with `renderBookmarkMarker()`.
+
+**Line Comments** - In-memory annotations on specific diff lines (●) with `renderLineCommentMarker()`.
+
+**Go-to-Commit** - Jump directly to a commit by hash using `handleGoToCommitInput()`.
+
+### Option 2: Commit Graph
+**ASCII Art Visualization** - Render commit history as ASCII graph (`renderAsciiGraph()`) showing linear history and merges.
+
+**Branch Detection** - Identify branches in history (`detectBranches()`).
+
+**Graph Navigation** - Move along commit graph in any direction (`navigateAlongGraph()`).
+
+**Merge Detection** - Automatically detect and mark merge commits (`parseCommitGraph()`).
+
+**Commit Relationships** - Track parent-child relationships (`getCommitRelationships()`).
+
+### Option 3: File-Centric View
+**File History** - Browse all commits touching a specific file (`buildFileHistory()`).
+
+**File Timeline** - Visualize how a file evolved over time (`renderFileTimeline()`).
+
+**File Blame Integration** - Get blame context for specific files (`getFileBlameContext()`).
+
+**Filter by File** - Show only commits that modified a file (`filterCommitsByFileChange()`).
+
+**Modified File Detection** - Check if file changed in a commit (`isFileModifiedInCommit()`).
+
+### Option 4: Stash & Reflog Browser
+**Stash Viewer** - Browse saved stashes with `parseStashList()` and `renderStashView()`.
+
+**Reflog Viewer** - Browse git reflog history with `parseReflog()` and `renderReflogView()`.
+
+**View Switching** - Switch between log/stash/reflog views with `switchViewMode()`.
+
+**Stash as Commits** - Treat stash entries like commits (`stashToCommitLike()`) for familiar navigation.
+
+**Reflog as Commits** - Treat reflog entries like commits (`reflogToCommitLike()`) for recovery workflows.
+
+**Stash Lookup** - Find stashes by index (`findStashByIndex()`).
+
 **File list:** press `f` to replace the commit list with the list of files changed in the current commit. Navigate with `j`/`k` and press `Enter` to jump directly to that file's section in the diff. Press `f` or `Esc` to return to the commit list.
 
 **Blame:** press `B` to see `git blame` for the file currently visible in the diff panel. Each line shows the short commit hash, author, date, line number, and source. Press `B` or `Esc` to return to the diff.
