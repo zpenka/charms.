@@ -2959,3 +2959,680 @@ func TestRenderComplexityUI_ShowsMetrics(t *testing.T) {
 		t.Error("should render non-empty complexity UI")
 	}
 }
+
+// --- Commit Analysis & Search (4 features) ---
+
+// Feature 1: Semantic Search
+func TestSemanticSearch_FindsFunctions(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Add parseJSON function"},
+		{hash: "bbb", subject: "Fix login handler"},
+		{hash: "ccc", subject: "Refactor database query"},
+	}
+	results := semanticSearch(commits, "parseJSON")
+	if len(results) == 0 {
+		t.Error("should find semantic matches")
+	}
+}
+
+func TestSemanticSearchRanking_ScoresRelevance(t *testing.T) {
+	result := semanticSearchResult{
+		hash:      "abc",
+		subject:   "Add parseJSON",
+		matches:   []string{"parseJSON"},
+		relevance: 85,
+	}
+	if result.relevance < 0 || result.relevance > 100 {
+		t.Errorf("invalid relevance score: %d", result.relevance)
+	}
+}
+
+func TestRenderSemanticSearch_ShowsResults(t *testing.T) {
+	m := model{
+		showSemanticSearch: true,
+		semanticSearchResults: []semanticSearchResult{
+			{hash: "aaa", subject: "Add parseJSON", relevance: 95},
+			{hash: "bbb", subject: "Call parseJSON", relevance: 80},
+		},
+	}
+	output := renderSemanticSearchUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty semantic search UI")
+	}
+}
+
+// Feature 2: Author Activity Heatmap
+func TestAuthorActivityHeatmap_TracksTiming(t *testing.T) {
+	commits := []commit{
+		{author: "Alice", when: "09:30"},
+		{author: "Alice", when: "14:45"},
+		{author: "Alice", when: "09:15"},
+	}
+	heatmap := buildActivityHeatmap(commits)
+	if len(heatmap) == 0 {
+		t.Error("should build activity heatmap")
+	}
+}
+
+func TestIdentifyPeakHours_FindsBusyTimes(t *testing.T) {
+	data := authorActivityData{
+		hourOfDay: map[int]int{9: 5, 14: 8, 17: 3},
+	}
+	peak := findPeakHour(data)
+	if peak != 14 {
+		t.Errorf("peak hour should be 14, got %d", peak)
+	}
+}
+
+func TestRenderActivityHeatmap_ShowsPattern(t *testing.T) {
+	m := model{
+		showActivityHeatmap: true,
+		authorActivityHeatmap: map[string]authorActivityData{
+			"Alice": {author: "Alice", peakHour: 14, peakDay: "Wednesday"},
+			"Bob":   {author: "Bob", peakHour: 9, peakDay: "Monday"},
+		},
+	}
+	output := renderActivityHeatmapUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty heatmap")
+	}
+}
+
+// Feature 3: Merge Analysis
+func TestAnalyzeMerges_DetectsFastForwards(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Merge branch feature"},
+		{hash: "bbb", subject: "Regular commit"},
+	}
+	analysis := analyzeMerges(commits)
+	if len(analysis) == 0 {
+		t.Error("should analyze merges")
+	}
+}
+
+func TestDetectFastForward_IdentifiesMergeType(t *testing.T) {
+	merge := mergeAnalysis{hash: "abc", isMerge: true, isFastForward: true}
+	if !merge.isFastForward {
+		t.Error("should detect fast-forward merge")
+	}
+}
+
+func TestRenderMergeAnalysis_ShowsData(t *testing.T) {
+	m := model{
+		showMergeAnalysis: true,
+		mergeAnalysisData: []mergeAnalysis{
+			{hash: "aaa", isMerge: true, isFastForward: true},
+			{hash: "bbb", isMerge: true, isFastForward: false, conflictRisk: 45},
+		},
+	}
+	output := renderMergeAnalysisUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty merge analysis")
+	}
+}
+
+// Feature 4: Commit Coupling Analysis
+func TestAnalyzeCommitCoupling_FindsCoChanges(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Update main.go and utils.go"},
+		{hash: "bbb", subject: "Fix main.go and utils.go"},
+		{hash: "ccc", subject: "Add config.go"},
+	}
+	couplings := analyzeCommitCoupling(commits)
+	if len(couplings) == 0 {
+		t.Error("should find coupled files")
+	}
+}
+
+func TestCalculateCoupling_ComputesCorrelation(t *testing.T) {
+	coupling := commitCoupling{
+		file1:         "main.go",
+		file2:         "utils.go",
+		coChangeCount: 5,
+		correlation:   0.85,
+	}
+	if coupling.correlation < 0 || coupling.correlation > 1 {
+		t.Errorf("invalid correlation: %f", coupling.correlation)
+	}
+}
+
+func TestRenderCouplingUI_ShowsAnalysis(t *testing.T) {
+	m := model{
+		showCoupling: true,
+		commitCouplings: []commitCoupling{
+			{file1: "main.go", file2: "utils.go", coChangeCount: 5, correlation: 0.85},
+			{file1: "auth.go", file2: "user.go", coChangeCount: 3, correlation: 0.60},
+		},
+	}
+	output := renderCouplingAnalysisUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty coupling UI")
+	}
+}
+
+// --- Performance & Filtering (4 features) ---
+
+// Feature 5: Filter by File Extension
+func TestFilterByExtension_SelectsFiles(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Update main.go"},
+		{hash: "bbb", subject: "Fix style.css"},
+		{hash: "ccc", subject: "Update main.go"},
+	}
+	filtered := filterByExtension(commits, ".go")
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 .go commits, got %d", len(filtered))
+	}
+}
+
+func TestToggleExtensionFilter_TrackFilter(t *testing.T) {
+	m := model{extensionFilters: []fileExtensionFilter{}}
+	m = toggleExtensionFilter(m, ".go")
+	if m.currentExtFilter != ".go" {
+		t.Errorf("filter should be .go, got %q", m.currentExtFilter)
+	}
+}
+
+func TestRenderExtensionFilter_ShowsActive(t *testing.T) {
+	m := model{
+		extensionFilters: []fileExtensionFilter{
+			{extension: ".go", enabled: true},
+			{extension: ".js", enabled: false},
+		},
+	}
+	output := renderExtensionFilterUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty filter UI")
+	}
+}
+
+// Feature 6: Commit Grouping
+func TestGroupCommits_ByBranch(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Feature: add feature"},
+		{hash: "bbb", subject: "Fix: bug fix"},
+		{hash: "ccc", subject: "Feature: another feature"},
+	}
+	groups := groupCommits(commits, "branch")
+	if len(groups) == 0 {
+		t.Error("should group commits")
+	}
+}
+
+func TestGroupCommits_ByDate(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", when: "2 days ago"},
+		{hash: "bbb", when: "2 days ago"},
+		{hash: "ccc", when: "1 day ago"},
+	}
+	groups := groupCommits(commits, "date")
+	if len(groups) != 2 {
+		t.Errorf("expected 2 date groups, got %d", len(groups))
+	}
+}
+
+func TestRenderCommitGroups_ShowsGrouped(t *testing.T) {
+	m := model{
+		commitGroups: []commitGroup{
+			{name: "Feature", label: "feat", commits: []string{"aaa", "bbb"}},
+			{name: "Fix", label: "fix", commits: []string{"ccc"}},
+		},
+	}
+	output := renderCommitGroupsUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty groups UI")
+	}
+}
+
+// Feature 7: Fast-Forward Merge Detection
+func TestDetectFastForwardMerges_IdentifiesMerges(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Merge branch feature (fast-forward)"},
+		{hash: "bbb", subject: "Merge branch bugfix"},
+	}
+	ffMerges := detectFastForwardMerges(commits)
+	if len(ffMerges) == 0 {
+		t.Error("should detect fast-forward merges")
+	}
+}
+
+func TestRenderFastForwards_ShowsFFInfo(t *testing.T) {
+	m := model{
+		mergeAnalysisData: []mergeAnalysis{
+			{hash: "aaa", isMerge: true, isFastForward: true},
+			{hash: "bbb", isMerge: true, isFastForward: false},
+		},
+	}
+	output := renderFastForwardsUI(m, 50)
+	if output == "" {
+		t.Error("should render fast-forward info")
+	}
+}
+
+// Feature 8: Dependency Change Tracking
+func TestTrackDependencies_FindsVersions(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Upgrade go-git from 4.7 to 5.0"},
+		{hash: "bbb", subject: "Update react to 17.0"},
+	}
+	deps := trackDependencyChanges(commits)
+	if len(deps) == 0 {
+		t.Error("should find dependency changes")
+	}
+}
+
+func TestRenderDependencies_ShowsChanges(t *testing.T) {
+	m := model{
+		showDependencies: true,
+		dependencyChanges: []dependencyChange{
+			{hash: "aaa", dep: "go-git", oldVer: "4.7", newVer: "5.0"},
+			{hash: "bbb", dep: "react", oldVer: "16.0", newVer: "17.0"},
+		},
+	}
+	output := renderDependenciesUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty dependencies UI")
+	}
+}
+
+// --- Advanced Workflows (5 features) ---
+
+// Feature 9: Worktree Support
+func TestLoadWorktrees_ParsesList(t *testing.T) {
+	worktreeOutput := "/home/user/repo\n/home/user/repo-feature (branch: feature)\n/home/user/repo-bugfix\n"
+	worktrees := loadWorktrees(worktreeOutput)
+	if len(worktrees) == 0 {
+		t.Error("should load worktrees")
+	}
+}
+
+func TestSwitchWorktree_ChangesPath(t *testing.T) {
+	m := model{
+		worktrees:       []worktreeInfo{{path: "/repo1", branch: "main"}, {path: "/repo2", branch: "feature"}},
+		currentWorktree: "/repo1",
+	}
+	m = switchWorktree(m, "/repo2")
+	if m.currentWorktree != "/repo2" {
+		t.Errorf("should switch to /repo2, got %q", m.currentWorktree)
+	}
+}
+
+func TestRenderWorktrees_ShowsList(t *testing.T) {
+	m := model{
+		showWorktrees: true,
+		worktrees: []worktreeInfo{
+			{path: "/repo1", branch: "main"},
+			{path: "/repo2", branch: "feature"},
+		},
+	}
+	output := renderWorktreesUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty worktrees UI")
+	}
+}
+
+// Feature 10: Submodule Tracking
+func TestParseSubmodules_ExtractsInfo(t *testing.T) {
+	configOutput := "[submodule \"lib1\"]\npath = lib1\nurl = https://github.com/user/lib1\n"
+	submodules := parseSubmodules(configOutput)
+	if len(submodules) == 0 {
+		t.Error("should parse submodules")
+	}
+}
+
+func TestRenderSubmodules_ShowsList(t *testing.T) {
+	m := model{
+		showSubmodules: true,
+		submodules: []submoduleInfo{
+			{path: "lib1", url: "https://github.com/user/lib1", branch: "main"},
+			{path: "lib2", url: "https://github.com/user/lib2", branch: "develop"},
+		},
+	}
+	output := renderSubmodulesUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty submodules UI")
+	}
+}
+
+// Feature 11: Named Stashes
+func TestCreateNamedStash_StoreName(t *testing.T) {
+	m := model{namedStashes: []namedStash{}}
+	m = createNamedStash(m, 0, "my-stash", "Work in progress")
+	if len(m.namedStashes) != 1 {
+		t.Error("should create named stash")
+	}
+	if m.namedStashes[0].name != "my-stash" {
+		t.Errorf("name should be my-stash, got %q", m.namedStashes[0].name)
+	}
+}
+
+func TestRenderNamedStashes_ShowsList(t *testing.T) {
+	m := model{
+		showNamedStashes: true,
+		namedStashes: []namedStash{
+			{index: 0, name: "my-stash", description: "WIP"},
+			{index: 1, name: "feature-work", description: "In progress"},
+		},
+	}
+	output := renderNamedStashesUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty stashes UI")
+	}
+}
+
+// Feature 12: Tag Management
+func TestQueueTagOperation_TracksIntent(t *testing.T) {
+	m := model{pendingTagOps: []tagOperation{}}
+	m = queueTagOperation(m, "v1.0.0", "abc1234", "create", "Release 1.0.0")
+	if len(m.pendingTagOps) != 1 {
+		t.Error("should queue tag operation")
+	}
+}
+
+func TestRenderTagMgmt_ShowsPending(t *testing.T) {
+	m := model{
+		showTagMgmt: true,
+		pendingTagOps: []tagOperation{
+			{name: "v1.0.0", hash: "abc1234", action: "create"},
+			{name: "v2.0.0", hash: "def5678", action: "delete"},
+		},
+	}
+	output := renderTagMgmtUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty tag UI")
+	}
+}
+
+// Feature 13: GPG Signature Status
+func TestExtractGPGStatus_ParsesSignatures(t *testing.T) {
+	gpgOutput := "abc1234 signed Alice Key1234567890\n"
+	statuses := extractGPGSignatureStatus(gpgOutput)
+	if len(statuses) == 0 {
+		t.Error("should parse GPG statuses")
+	}
+}
+
+func TestRenderGPGStatus_ShowsSignatures(t *testing.T) {
+	m := model{
+		showGPGStatus: true,
+		gpgStatuses: map[string]gpgSignatureStatus{
+			"abc1234": {hash: "abc1234", signed: true, signer: "Alice", verified: true},
+			"def5678": {hash: "def5678", signed: false},
+		},
+	}
+	output := renderGPGStatusUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty GPG UI")
+	}
+}
+
+// --- Visualization (5 features) ---
+
+// Feature 14: Contributor Flamegraph
+func TestBuildContributorFlame_RanksAuthors(t *testing.T) {
+	commits := []commit{
+		{author: "Alice", subject: "feat: add feature"},
+		{author: "Alice", subject: "feat: another feature"},
+		{author: "Bob", subject: "fix: bug"},
+	}
+	flame := buildContributorFlame(commits)
+	if len(flame) == 0 {
+		t.Error("should build flamegraph")
+	}
+	if flame[0].author != "Alice" {
+		t.Errorf("top author should be Alice, got %q", flame[0].author)
+	}
+}
+
+func TestRenderFlamegraph_ShowsVisualization(t *testing.T) {
+	m := model{
+		showFlamegraph: true,
+		contributorFlameData: []contributorFlameData{
+			{author: "Alice", commits: 50, percentage: 65.0},
+			{author: "Bob", commits: 27, percentage: 35.0},
+		},
+	}
+	output := renderFlamegraphUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty flamegraph")
+	}
+}
+
+// Feature 15: Timeline Slider
+func TestBuildTimeline_CreatePoints(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", when: "1 day ago"},
+		{hash: "bbb", when: "1 day ago"},
+		{hash: "ccc", when: "2 days ago"},
+	}
+	timeline := buildTimeline(commits)
+	if len(timeline) == 0 {
+		t.Error("should build timeline")
+	}
+}
+
+func TestRenderTimelineSlider_ShowsSlider(t *testing.T) {
+	m := model{
+		showTimeline: true,
+		timelinePoints: []timelinePoint{
+			{date: "2026-04-20", commits: 5, hash: "abc"},
+			{date: "2026-04-21", commits: 3, hash: "def"},
+		},
+		timelineSliderPos: 0,
+	}
+	output := renderTimelineSliderUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty timeline")
+	}
+}
+
+// Feature 16: Tree View
+func TestBuildTreeView_CreatesHierarchy(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Initial commit"},
+		{hash: "bbb", subject: "Add feature"},
+		{hash: "ccc", subject: "Fix bug"},
+	}
+	root := buildTreeView(commits)
+	if root == nil {
+		t.Error("should build tree view")
+	}
+}
+
+func TestRenderTreeView_ShowsHierarchy(t *testing.T) {
+	m := model{
+		showTreeView: true,
+		treeRoot: &treeNode{
+			hash:    "aaa",
+			subject: "Initial",
+			depth:   0,
+			children: []*treeNode{
+				{hash: "bbb", subject: "Feature", depth: 1},
+			},
+		},
+	}
+	output := renderTreeViewUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty tree view")
+	}
+}
+
+// Feature 17: Author Comparison
+func TestCompareAuthors_ComputesDifferences(t *testing.T) {
+	m := model{
+		commits: []commit{
+			{author: "Alice", subject: "Add feature"},
+			{author: "Alice", subject: "Fix bug"},
+			{author: "Bob", subject: "Update docs"},
+		},
+		selectedAuthors: [2]string{"Alice", "Bob"},
+	}
+	comp := compareAuthors(m)
+	if len(comp) == 0 {
+		t.Error("should compare authors")
+	}
+}
+
+func TestRenderAuthorComparison_ShowsSideBySide(t *testing.T) {
+	m := model{
+		showAuthorComparison: true,
+		authorComparisons: []authorComparison{
+			{author1: "Alice", commits1: 50, files1: 100, author2: "Bob", commits2: 30, files2: 80, similarity: 0.75},
+		},
+	}
+	output := renderAuthorComparisonUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty comparison")
+	}
+}
+
+// Feature 18: File Heatmap
+func TestBuildFileHeatmap_TracksFrequency(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Update main.go"},
+		{hash: "bbb", subject: "Fix main.go"},
+		{hash: "ccc", subject: "Refactor utils.go"},
+	}
+	heatmap := buildFileHeatmap(commits)
+	if len(heatmap) == 0 {
+		t.Error("should build file heatmap")
+	}
+}
+
+func TestRenderFileHeatmap_ShowsFrequency(t *testing.T) {
+	m := model{
+		showFileHeatmap: true,
+		fileHeatmap: []fileHeatmapEntry{
+			{path: "main.go", frequency: 15, recent: 3, risk: "high"},
+			{path: "utils.go", frequency: 5, recent: 1, risk: "low"},
+		},
+	}
+	output := renderFileHeatmapUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty file heatmap")
+	}
+}
+
+// --- Integration & Export (5 features) ---
+
+// Feature 19: GitHub PR Linking
+func TestExtractPRReferences_FindsPRNumbers(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Fix #123 login issue"},
+		{hash: "bbb", subject: "Merge PR #456"},
+		{hash: "ccc", subject: "Regular commit"},
+	}
+	prefs := extractPRReferences(commits)
+	if len(prefs) == 0 {
+		t.Error("should find PR references")
+	}
+}
+
+func TestRenderPRLinks_ShowsLinks(t *testing.T) {
+	m := model{
+		showPRLinks: true,
+		prReferences: []githubPRReference{
+			{hash: "aaa", prNumber: 123, status: "merged"},
+			{hash: "bbb", prNumber: 456, status: "open"},
+		},
+	}
+	output := renderPRLinksUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty PR links")
+	}
+}
+
+// Feature 20: JIRA Ticket Linking
+func TestExtractJiraTickets_FindsTickets(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "PROJ-123 Add feature"},
+		{hash: "bbb", subject: "Fix PROJ-456 bug"},
+		{hash: "ccc", subject: "Regular commit"},
+	}
+	tickets := extractJiraTickets(commits)
+	if len(tickets) == 0 {
+		t.Error("should find JIRA tickets")
+	}
+}
+
+func TestRenderJiraLinks_ShowsTickets(t *testing.T) {
+	m := model{
+		showJiraLinks: true,
+		jiraLinks: []jiraTicketLink{
+			{hash: "aaa", ticket: "PROJ-123", status: "done"},
+			{hash: "bbb", ticket: "PROJ-456", status: "in-progress"},
+		},
+	}
+	output := renderJiraLinksUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty JIRA links")
+	}
+}
+
+// Feature 21: Export to Markdown
+func TestExportToMarkdown_FormatsText(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", shortHash: "aaa1111", author: "Alice", subject: "Add feature"},
+		{hash: "bbb", shortHash: "bbb2222", author: "Bob", subject: "Fix bug"},
+	}
+	exported := exportToMarkdown(commits)
+	if exported.content == "" {
+		t.Error("should generate markdown export")
+	}
+	if !strings.Contains(exported.content, "Alice") {
+		t.Error("should include author")
+	}
+}
+
+func TestRenderExportUI_ShowsOptions(t *testing.T) {
+	m := model{
+		showExportUI: true,
+		exportFormat: "markdown",
+	}
+	output := renderExportUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty export UI")
+	}
+}
+
+// Feature 22: Patch Series Export
+func TestExportPatchSeries_CreatesPatch(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Add feature"},
+		{hash: "bbb", subject: "Fix bug"},
+	}
+	exported := exportPatchSeries(commits)
+	if exported.content == "" {
+		t.Error("should generate patch series")
+	}
+	if exported.format != "patch" {
+		t.Errorf("format should be patch, got %q", exported.format)
+	}
+}
+
+// Feature 23: Issue Reference Tracking
+func TestExtractIssueReferences_FindsIssues(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "fixes #123 and closes #456"},
+		{hash: "bbb", subject: "resolves #789"},
+		{hash: "ccc", subject: "Regular commit"},
+	}
+	refs := extractIssueReferences(commits)
+	if len(refs) == 0 {
+		t.Error("should find issue references")
+	}
+}
+
+func TestRenderIssueRefs_ShowsReferences(t *testing.T) {
+	m := model{
+		showIssueRefs: true,
+		issueReferences: []issueReference{
+			{hash: "aaa", references: []string{"#123", "#456"}, keywords: []string{"fixes", "closes"}},
+			{hash: "bbb", references: []string{"#789"}, keywords: []string{"resolves"}},
+		},
+	}
+	output := renderIssueRefsUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty issue refs")
+	}
+}

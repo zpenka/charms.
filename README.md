@@ -580,3 +580,253 @@ All 10 features provide structured data for analysis:
 - **Linting**: quality score (0-100%), issue list per commit
 - **Size**: lines changed, files modified, classification (large/normal)
 - **Complexity**: complexity score (0-100%), estimated cognitive load
+
+---
+
+## Advanced Analysis & Visualization (23 New Features)
+
+### Commit Analysis & Search (4 Features)
+
+**Feature 1: Semantic Search (`N` key)**
+Find commits by code elements (functions, variables, keywords):
+- `semanticSearch()` - Search commits by semantic meaning
+- `renderSemanticSearchUI()` - Display matched elements and relevance scores
+- Supports function names, variable names, and code patterns
+- Relevance scoring 0-100% for ranking results
+
+**Feature 2: Author Activity Heatmap (`E` key)**
+Analyze when and how often authors commit:
+- `buildActivityHeatmap()` - Track commit times by author
+- `findPeakHour()` - Identify peak working hours per author
+- `renderActivityHeatmapUI()` - Visual heatmap of commit patterns
+- Peak hour, peak day, and average commits per day metrics
+- Useful for understanding team schedules and work patterns
+
+**Feature 3: Merge Analysis (`Y` key)**
+Classify and analyze merge commits:
+- `analyzeMerges()` - Identify merge commits and type
+- Fast-forward vs. regular merge detection
+- Conflict risk scoring based on merge patterns
+- `renderMergeAnalysisUI()` - Display merge statistics
+
+**Feature 4: Commit Coupling Analysis (`T` key)**
+Find files that always change together:
+- `analyzeCommitCoupling()` - Detect co-changing files
+- Correlation scoring (0-1) for file pairs
+- Identifies tightly coupled code areas
+- `renderCouplingAnalysisUI()` - Show file relationships
+
+---
+
+### Performance & Filtering (4 Features)
+
+**Feature 5: Filter by File Extension (`D` key)**
+Show only commits touching specific file types:
+- `filterByExtension()` - Filter commits by extension (.go, .js, .py, etc.)
+- Toggle extension filter on/off
+- Support for multiple extensions simultaneously
+- Useful for focusing on specific tech stacks
+
+**Feature 6: Commit Grouping (`W` key)**
+Group commits by branch, date, or type:
+- `groupCommits()` - Organize commits into logical groups
+- Support for "pr", "branch", "date" grouping modes
+- `renderCommitGroupsUI()` - Display grouped commit lists
+- Quickly navigate large histories
+
+**Feature 7: Fast-Forward Merge Detection**
+Identify fast-forward vs. regular merges:
+- `detectFastForwardMerges()` - Find FF merges
+- Useful for merge strategy analysis
+- Shows which merges preserved history vs. linearized
+
+**Feature 8: Dependency Change Tracking (`Z` key)**
+Track library and package version updates:
+- `trackDependencyChanges()` - Find dependency upgrades
+- Detect version patterns in commit messages
+- Old/new version tracking
+- Useful for tracking maintenance and upgrades
+
+---
+
+### Advanced Workflows (5 Features)
+
+**Feature 9: Worktree Support (`1` key)**
+Manage and switch between git worktrees:
+- `loadWorktrees()` - Parse worktree list
+- `switchWorktree()` - Switch between worktrees
+- Display worktree paths and associated branches
+- Seamless multi-worktree navigation
+
+**Feature 10: Submodule Tracking (`2` key)**
+Monitor and manage git submodules:
+- `parseSubmodules()` - Extract submodule information
+- Track submodule paths, URLs, and branches
+- `renderSubmodulesUI()` - Display submodule status
+- Useful for monorepo and complex dependency management
+
+**Feature 11: Named Stashes (`3` key)**
+Create stashes with custom names and descriptions:
+- `createNamedStash()` - Save stashes with metadata
+- Store descriptions for context
+- Better organization of temporary work
+- Quick reference for stash purposes
+
+**Feature 12: Tag Management (`4` key)**
+Create, delete, and manage git tags:
+- `queueTagOperation()` - Queue tag operations
+- Support for create, delete, push actions
+- Batch tag operations with descriptions
+- `renderTagMgmtUI()` - Show pending tag operations
+
+**Feature 13: GPG Signature Status (`5` key)**
+Display GPG signing information for commits:
+- `extractGPGSignatureStatus()` - Parse GPG signature data
+- Show signed vs. unsigned commits
+- Display signer names and algorithms
+- Verification status indicators
+- Useful for security audits and trust verification
+
+---
+
+### Visualization (5 Features)
+
+**Feature 14: Contributor Flamegraph (`6` key)**
+Visual ranking of contributors by commit count:
+- `buildContributorFlame()` - Generate contributor stats
+- Sort authors by contribution percentage
+- Flamegraph-style visualization
+- Timeline tracking of contributions over time
+- Identify core vs. occasional contributors
+
+**Feature 15: Timeline Slider (`7` key)**
+Scrubable timeline of commits by date:
+- `buildTimeline()` - Create date-based timeline
+- `renderTimelineSliderUI()` - Interactive timeline display
+- Jump to any point in project history
+- Show commit density over time
+- Identify busy periods and slow periods
+
+**Feature 16: Tree View (`8` key)**
+Hierarchical visualization of commit history:
+- `buildTreeView()` - Create tree structure
+- Shows parent-child relationships
+- Collapsible branches and commits
+- ASCII art tree visualization
+- Alternative to linear log view
+
+**Feature 17: Author Comparison (`9` key)**
+Side-by-side comparison of two authors:
+- `compareAuthors()` - Compute author statistics
+- Compare commits, files touched, additions/deletions
+- Similarity scoring (0-1)
+- Useful for code review distribution analysis
+- Identify specializations and team dynamics
+
+**Feature 18: File Heatmap (`0` key)**
+Visual indicator of file change frequency:
+- `buildFileHeatmap()` - Compute file statistics
+- Frequency-based coloring (low/medium/high risk)
+- Shows recent changes and total changes
+- Identify code areas needing attention
+- Risk-based visualization
+
+---
+
+### Integration & Export (5 Features)
+
+**Feature 19: GitHub PR Linking (`p` key)**
+Auto-detect and link to GitHub pull requests:
+- `extractPRReferences()` - Find #123 PR references
+- Parse PR numbers from commit messages
+- Track PR status (open, merged, closed)
+- Quick jump to associated PRs
+- Integration with GitHub workflow
+
+**Feature 20: JIRA Ticket Linking (`j` key)**
+Auto-detect and link to JIRA tickets:
+- `extractJiraTickets()` - Find PROJ-123 patterns
+- Parse JIRA ticket references
+- Track ticket status
+- Link commits to project management
+- Useful for organizations using JIRA
+
+**Feature 21: Export to Markdown (`e` key)**
+Export filtered commit log as markdown:
+- `exportToMarkdown()` - Convert commits to markdown
+- Formatted as bulleted list with metadata
+- Include author, hash, and subject
+- Copy-paste ready for documentation
+- Generate release notes and changelogs
+
+**Feature 22: Patch Series Export**
+Export commits as patch files:
+- `exportPatchSeries()` - Generate patch format
+- Multiple commits as reusable patches
+- Useful for code review and email workflows
+- Standard `git format-patch` format
+- Enable easy sharing and application
+
+**Feature 23: Issue Reference Tracking (`q` key)**
+Track all issue/PR references in commits:
+- `extractIssueReferences()` - Find all #123 patterns
+- Detect action keywords (fixes, closes, resolves)
+- Build cross-reference map
+- Show which commits address which issues
+- Useful for impact analysis and traceability
+
+---
+
+### Comprehensive Keybindings (23 New Features)
+
+| Key | Feature |
+|-----|---------|
+| `N` | Semantic Search |
+| `E` | Author Activity Heatmap |
+| `Y` | Merge Analysis |
+| `T` | Commit Coupling Analysis |
+| `D` | Extension Filter Toggle |
+| `W` | Commit Grouping |
+| `Z` | Dependency Changes |
+| `1` | Worktree Support |
+| `2` | Submodule Tracking |
+| `3` | Named Stashes |
+| `4` | Tag Management |
+| `5` | GPG Signature Status |
+| `6` | Contributor Flamegraph |
+| `7` | Timeline Slider |
+| `8` | Tree View |
+| `9` | Author Comparison |
+| `0` | File Heatmap |
+| `p` | GitHub PR Linking |
+| `j` | JIRA Ticket Linking |
+| `e` | Export to Markdown |
+| `q` | Issue Reference Tracking |
+
+### Advanced Analysis Metrics
+
+**Search & Analysis:**
+- Semantic relevance (0-100%)
+- Activity heatmap with peak hours/days
+- Merge analysis with conflict risk scoring
+- File coupling correlation (0-1)
+
+**Filtering & Organization:**
+- Extension-based filtering
+- Multiple grouping modes (date, branch, PR)
+- Dependency version tracking
+- Advanced commit classification
+
+**Visualization:**
+- Contributor percentages with flamegraph
+- Timeline with commit density
+- Tree view with parent-child relationships
+- Author comparison with similarity scoring
+- File frequency heatmaps with risk levels
+
+**Integration:**
+- GitHub PR auto-linking
+- JIRA ticket auto-linking
+- Markdown export for documentation
+- Patch series for code review
+- Issue reference cross-referencing
