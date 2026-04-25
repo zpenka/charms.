@@ -44,6 +44,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
 		return tickGame(m), doTick()
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
 	case tea.KeyMsg:
 		if m.state == StateModeSelect {
 			switch msg.String() {
@@ -142,12 +146,12 @@ func (m model) View() string {
 	for _, mg := range m.mugs {
 		mugAt[[2]int{mg.lane, mg.x}] = true
 	}
-	type custRender struct {
-		kind customerKind
-	}
-	custAt := make(map[[2]int]custRender)
+	custKindAt := make(map[[2]int]customerKind)
+	custPresentAt := make(map[[2]int]bool)
 	for _, c := range m.customers {
-		custAt[[2]int{c.lane, c.x}] = custRender{c.kind}
+		key := [2]int{c.lane, c.x}
+		custPresentAt[key] = true
+		custKindAt[key] = c.kind
 	}
 	serveAt := make(map[[2]int]bool)
 	for _, a := range m.serveAnims {
@@ -171,9 +175,8 @@ func (m model) View() string {
 				sb.WriteString(serveStyle.Render("*"))
 			case mugAt[key]:
 				sb.WriteString(mugStyle.Render("o"))
-			case custAt[key] != (custRender{}):
-				cr := custAt[key]
-				switch cr.kind {
+			case custPresentAt[key]:
+				switch custKindAt[key] {
 				case KindThirsty:
 					sb.WriteString(thirstyStyle.Render("!"))
 				case KindVIP:
@@ -263,7 +266,11 @@ func (m model) View() string {
 		sb.WriteString("\n\n")
 	}
 
-	return sb.String()
+	content := sb.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func Run() {

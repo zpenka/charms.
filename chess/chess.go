@@ -38,12 +38,12 @@ var (
 )
 
 var glyphs = map[chess.PieceType][2]string{
-	chess.King:   {"♔", "♚"},
-	chess.Queen:  {"♕", "♛"},
-	chess.Rook:   {"♖", "♜"},
-	chess.Bishop: {"♗", "♝"},
-	chess.Knight: {"♘", "♞"},
-	chess.Pawn:   {"♙", "♟"},
+	chess.King:   {"♚", "♚"},
+	chess.Queen:  {"♛", "♛"},
+	chess.Rook:   {"♜", "♜"},
+	chess.Bishop: {"♝", "♝"},
+	chess.Knight: {"♞", "♞"},
+	chess.Pawn:   {"♟", "♟"},
 }
 
 type computerMoveMsg struct{ move *chess.Move }
@@ -103,6 +103,8 @@ type model struct {
 	whiteTime         time.Duration
 	blackTime         time.Duration
 	clockOn           bool
+	width             int
+	height            int
 }
 
 func (m model) boardSquare(row, col int) chess.Square {
@@ -157,6 +159,12 @@ func isPromotionMove(g *chess.Game, from, to chess.Square) bool {
 func (m model) Init() tea.Cmd { return tick() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if wsm, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = wsm.Width
+		m.height = wsm.Height
+		return m, nil
+	}
+
 	if cmsg, ok := msg.(computerMoveMsg); ok {
 		if cmsg.move != nil {
 			m.executeMove(cmsg.move.S1(), cmsg.move.S2())
@@ -600,17 +608,17 @@ func (m model) View() string {
 	sb.WriteString("\n ")
 	sb.WriteString(titleStyle.Render("Chess"))
 	sb.WriteString("\n\n")
-	fileLabels := "    a  b  c  d  e  f  g  h\n"
+	fileLabels := "      a    b    c    d    e    f    g    h  \n"
 	if m.flipped {
-		fileLabels = "    h  g  f  e  d  c  b  a\n"
+		fileLabels = "      h    g    f    e    d    c    b    a  \n"
 	}
 	sb.WriteString(fileLabels)
 
 	sc := schemes[m.schemeIdx]
-	sqLight     := lipgloss.NewStyle().Background(lipgloss.Color(sc.light)).Foreground(lipgloss.Color("#1a1a1a"))
-	sqDark      := lipgloss.NewStyle().Background(lipgloss.Color(sc.dark)).Foreground(lipgloss.Color("#1a1a1a"))
-	sqMoveLight := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveLight)).Foreground(lipgloss.Color("#1a1a1a"))
-	sqMoveDark  := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveDark)).Foreground(lipgloss.Color("#ffffff"))
+	sqLight     := lipgloss.NewStyle().Background(lipgloss.Color(sc.light)).Foreground(lipgloss.Color("#555555"))
+	sqDark      := lipgloss.NewStyle().Background(lipgloss.Color(sc.dark)).Foreground(lipgloss.Color("#cccccc"))
+	sqMoveLight := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveLight)).Foreground(lipgloss.Color("#555555"))
+	sqMoveDark  := lipgloss.NewStyle().Background(lipgloss.Color(sc.moveDark)).Foreground(lipgloss.Color("#cccccc"))
 
 	board := m.game.Position().Board()
 
@@ -639,16 +647,16 @@ func (m model) View() string {
 			var cell string
 			if piece == chess.NoPiece {
 				if isValidDest {
-					cell = " · "
+					cell = "  ·  "
 				} else {
-					cell = "   "
+					cell = "     "
 				}
 			} else {
 				idx := 0
 				if piece.Color() == chess.Black {
 					idx = 1
 				}
-				cell = " " + glyphs[piece.Type()][idx] + " "
+				cell = "  " + glyphs[piece.Type()][idx] + "  "
 			}
 
 			var style lipgloss.Style
@@ -677,14 +685,11 @@ func (m model) View() string {
 				style = sqDark
 			}
 
-			// Always render pieces in their own colour so white pieces aren't
-			// made dark by a light-square foreground, and black pieces aren't
-			// turned white by a last-move highlight's foreground.
 			if piece != chess.NoPiece {
 				if piece.Color() == chess.White {
-					style = style.Foreground(lipgloss.Color("#FFFFFF"))
+					style = style.Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 				} else {
-					style = style.Foreground(lipgloss.Color("#1a1a1a"))
+					style = style.Foreground(lipgloss.Color("#000000")).Bold(true)
 				}
 			}
 
@@ -757,7 +762,11 @@ func (m model) View() string {
 	sb.WriteString(" Esc  cancel selection   q  quit\n")
 	sb.WriteString(" f  flip board   ?  hint   r  resign   t  takeback\n\n")
 
-	return sb.String()
+	content := sb.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func Run() {

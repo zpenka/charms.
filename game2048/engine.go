@@ -37,6 +37,8 @@ type model struct {
 	allTimeBest int
 	scores      []ScoreEntry
 	scorePath   string
+	width       int
+	height      int
 }
 
 func newGame() model {

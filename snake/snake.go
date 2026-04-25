@@ -36,17 +36,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
 		return tickGame(m), doTick()
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "up", "w":
+		case "up", "w", "k":
 			return changeDir(m, DirUp), nil
-		case "down", "s":
+		case "down", "s", "j":
 			return changeDir(m, DirDown), nil
-		case "left", "a":
+		case "left", "a", "h":
 			return changeDir(m, DirLeft), nil
-		case "right", "d":
+		case "right", "d", "l":
 			return changeDir(m, DirRight), nil
 		case " ", "enter":
 			switch m.state {
@@ -150,11 +154,15 @@ func (m model) View() string {
 		sb.WriteString(msgStyle.Render("Space to play again  q to quit"))
 		sb.WriteString("\n\n")
 	default:
-		sb.WriteString(msgStyle.Render(" ↑↓←→ / wasd  move   q  quit"))
+		sb.WriteString(msgStyle.Render(" ↑↓←→ / wasd / hjkl  move   q  quit"))
 		sb.WriteString("\n\n")
 	}
 
-	return sb.String()
+	content := sb.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func Run() {

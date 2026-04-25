@@ -666,7 +666,7 @@ func TestView_ContainsMessage(t *testing.T) {
 
 func TestView_ContainsAllPieceGlyphs(t *testing.T) {
 	view := newModel().View()
-	for _, g := range []string{"♔", "♕", "♖", "♗", "♘", "♙", "♚", "♛", "♜", "♝", "♞", "♟"} {
+	for _, g := range []string{"♚", "♛", "♜", "♝", "♞", "♟"} {
 		if !strings.Contains(view, g) {
 			t.Errorf("view missing piece glyph %q", g)
 		}

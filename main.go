@@ -71,6 +71,8 @@ var games = []game{
 type lobbyModel struct {
 	cursor int
 	chosen int // -1 = none chosen yet
+	width  int
+	height int
 }
 
 func newLobbyModel() lobbyModel {
@@ -80,6 +82,11 @@ func newLobbyModel() lobbyModel {
 func (m lobbyModel) Init() tea.Cmd { return nil }
 
 func (m lobbyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if wsm, ok := msg.(tea.WindowSizeMsg); ok {
+		m.width = wsm.Width
+		m.height = wsm.Height
+		return m, nil
+	}
 	if km, ok := msg.(tea.KeyMsg); ok {
 		switch km.String() {
 		case "ctrl+c", "q":
@@ -110,7 +117,7 @@ func (m lobbyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m lobbyModel) View() string {
 	var sb strings.Builder
-	sb.WriteString("\n ")
+	sb.WriteString("\n\n ")
 	sb.WriteString(lobbyTitle.Render("charms."))
 	sb.WriteString("\n\n ")
 	sb.WriteString(lobbySubtitle.Render("what do you want to play?"))
@@ -140,10 +147,14 @@ func (m lobbyModel) View() string {
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\n ")
+	sb.WriteString("\n\n ")
 	sb.WriteString(lobbySubtitle.Render("↑↓ / jk  navigate   Enter  play   q  quit"))
 	sb.WriteString("\n\n")
-	return sb.String()
+	content := sb.String()
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
 }
 
 func main() {
