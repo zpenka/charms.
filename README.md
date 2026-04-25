@@ -267,6 +267,8 @@ The diff panel shows `git show --stat --patch` output for the selected commit, c
 
 **Search:** press `/` to enter search mode. Typing filters the commit list live by subject, author name, or short hash. `Esc` clears the filter; `Enter` keeps it and returns to normal navigation. The header shows `[/query] N` with the match count while a filter is active.
 
+**Filtering:** The commit list supports persistent author and time-based filtering via the model's `authorFilter` and `sinceFilter` fields. These filters stack with the search query to narrow results. For example, you can filter to commits from "Jane Smith" in the last 7 days, then further search within those results.
+
 **File list:** press `f` to replace the commit list with the list of files changed in the current commit. Navigate with `j`/`k` and press `Enter` to jump directly to that file's section in the diff. Press `f` or `Esc` to return to the commit list.
 
 **Blame:** press `B` to see `git blame` for the file currently visible in the diff panel. Each line shows the short commit hash, author, date, line number, and source. Press `B` or `Esc` to return to the diff.
