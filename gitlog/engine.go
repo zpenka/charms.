@@ -1,6 +1,7 @@
 package gitlog
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -72,10 +73,13 @@ type model struct {
 	blameOffset int
 	// Count prefix for j/k navigation
 	countBuf string
-	repoPath string
-	width    int
-	height   int
-	loading  bool
+	// Filtering
+	authorFilter string
+	sinceFilter  int // days; 0 = no filter
+	repoPath     string
+	width        int
+	height       int
+	loading      bool
 }
 
 func newModel(repoPath string) model {
@@ -268,9 +272,21 @@ func filterCommits(commits []commit, query string) []commit {
 	return out
 }
 
-// visibleCommits returns the commit list after applying the current search query.
+// visibleCommits returns the commit list after applying all active filters:
+// search query, author filter, and time-based filter.
 func visibleCommits(m model) []commit {
-	return filterCommits(m.commits, m.query)
+	result := m.commits
+	// Apply time filter first
+	if m.sinceFilter > 0 {
+		result = filterCommitsSince(result, m.sinceFilter)
+	}
+	// Apply author filter
+	if m.authorFilter != "" {
+		result = filterCommitsByAuthor(result, m.authorFilter)
+	}
+	// Apply search query filter last
+	result = filterCommits(result, m.query)
+	return result
 }
 
 // scrollToDiffLine sets diffOffset so that lineIdx is visible, clamped to valid range.
@@ -417,4 +433,70 @@ func toggleBranchView(m model) model {
 		m.branchCursor = 0
 	}
 	return m
+}
+
+// filterCommitsByAuthor returns commits whose author exactly matches the given author
+// (case-insensitive).
+func filterCommitsByAuthor(commits []commit, author string) []commit {
+	if author == "" {
+		return commits
+	}
+	var out []commit
+	for _, c := range commits {
+		if strings.EqualFold(c.author, author) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// filterCommitsSince returns commits from the last N days, parsed from the
+// "when" field (e.g., "5 days ago", "2 weeks ago"). Returns all commits if
+// days <= 0.
+func filterCommitsSince(commits []commit, days int) []commit {
+	if days <= 0 {
+		return commits
+	}
+	var out []commit
+	for _, c := range commits {
+		if isWithinDays(c.when, days) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// isWithinDays checks if a "when" string (e.g., "5 days ago") represents
+// a time within the last N days.
+func isWithinDays(when string, days int) bool {
+	whenLower := strings.ToLower(when)
+
+	// Extract number from strings like "5 days ago", "2 weeks ago", etc.
+	re := regexp.MustCompile(`(\d+)\s+(day|week|month|year)`)
+	matches := re.FindStringSubmatch(whenLower)
+	if len(matches) < 3 {
+		return false
+	}
+
+	num, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return false
+	}
+
+	unit := matches[2]
+	totalDays := 0
+	switch unit {
+	case "day":
+		totalDays = num
+	case "week":
+		totalDays = num * 7
+	case "month":
+		totalDays = num * 30
+	case "year":
+		totalDays = num * 365
+	default:
+		return false
+	}
+
+	return totalDays <= days
 }
