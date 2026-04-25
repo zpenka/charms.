@@ -233,6 +233,7 @@ A two-panel TUI for browsing the git history of the current repository — commi
 |-----|--------|
 | `j` / `↓` | Move to next commit |
 | `k` / `↑` | Move to previous commit |
+| `5j` / `5k` | Jump 5 commits down / up (any number prefix works) |
 | `g` / `G` | Jump to top / bottom of commit list |
 | `l` / `Tab` | Switch focus to diff panel |
 | `h` / `Tab` | Switch focus back to commit list |
@@ -242,18 +243,32 @@ A two-panel TUI for browsing the git history of the current repository — commi
 | `/` | Enter search mode — filter commits by message, author, or hash |
 | `Esc` *(searching)* | Clear filter and exit search |
 | `Enter` *(searching)* | Confirm filter and exit search |
+| `b` | Open branch picker — browse and switch to any local or remote branch |
+| `j` / `k` *(branch picker)* | Navigate branches |
+| `Enter` *(branch picker)* | Switch to selected branch and reload history |
+| `b` / `Esc` *(branch picker)* | Close without switching |
 | `f` | Toggle file list — shows files changed in the current commit |
 | `j` / `k` *(file list)* | Navigate files |
 | `Enter` *(file list)* | Jump to that file's diff and switch to diff panel |
 | `f` / `Esc` *(file list)* | Close file list |
+| `B` | Open blame view for the file currently visible in the diff panel |
+| `j` / `k` *(blame)* | Scroll blame one line |
+| `d` / `u` *(blame)* | Scroll blame half a page |
+| `B` / `Esc` *(blame)* | Return to diff |
 | `y` | Copy the current commit's full hash to the clipboard |
 | `e` | Open the current commit's diff in `$EDITOR` |
 | `q` | Quit to lobby |
 
 The diff panel shows `git show --stat --patch` output for the selected commit, colour-coded: green for additions, red for removals, cyan for hunk headers, grey for file metadata. The commit list auto-scrolls to keep the cursor centred. Up to 200 commits are loaded on launch; diffs are fetched asynchronously as you navigate.
 
+**Count prefix:** type a number before `j` or `k` to jump multiple commits at once (e.g. `10j` moves down 10). The count is shown in the footer while you're typing it. Any other key cancels the count.
+
+**Branch picker:** press `b` to load all local and remote branches. The currently checked-out branch is marked with `●`. Selecting a branch reloads the commit log for that ref; the active ref is shown in the title bar.
+
 **Search:** press `/` to enter search mode. Typing filters the commit list live by subject, author name, or short hash. `Esc` clears the filter; `Enter` keeps it and returns to normal navigation. The header shows `[/query] N` with the match count while a filter is active.
 
 **File list:** press `f` to replace the commit list with the list of files changed in the current commit. Navigate with `j`/`k` and press `Enter` to jump directly to that file's section in the diff. Press `f` or `Esc` to return to the commit list.
+
+**Blame:** press `B` to see `git blame` for the file currently visible in the diff panel. Each line shows the short commit hash, author, date, line number, and source. Press `B` or `Esc` to return to the diff.
 
 **Clipboard:** `y` copies the full 40-character commit hash. Requires `pbcopy` (macOS), `wl-copy` (Wayland), `xclip`, or `xsel` to be installed.
