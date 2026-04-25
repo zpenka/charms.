@@ -1,6 +1,7 @@
 package gitlog
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -39,6 +40,14 @@ type fileItem struct {
 	diffIdx int
 }
 
+type blameLine struct {
+	shortHash string
+	author    string
+	date      string
+	lineNum   int
+	text      string
+}
+
 type model struct {
 	commits    []commit
 	cursor     int
@@ -51,10 +60,22 @@ type model struct {
 	searching  bool
 	query      string
 	flash      string
-	repoPath   string
-	width      int
-	height     int
-	loading    bool
+	// Branch picker
+	showBranch    bool
+	branches      []string
+	branchCursor  int
+	currentRef    string
+	currentBranch string
+	// Blame view
+	showBlame   bool
+	blameLines  []blameLine
+	blameOffset int
+	// Count prefix for j/k navigation
+	countBuf string
+	repoPath string
+	width    int
+	height   int
+	loading  bool
 }
 
 func newModel(repoPath string) model {
@@ -274,6 +295,126 @@ func toggleFileView(m model) model {
 	m.showFiles = !m.showFiles
 	if !m.showFiles {
 		m.fileCursor = 0
+	}
+	return m
+}
+
+// parseBranches parses the output of "git branch -a", stripping the current-branch
+// marker (*) and skipping ref-pointer lines (e.g. "origin/HEAD -> origin/main").
+func parseBranches(output string) []string {
+	var branches []string
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		line = strings.TrimPrefix(line, "* ")
+		if strings.Contains(line, " -> ") {
+			continue
+		}
+		branches = append(branches, line)
+	}
+	return branches
+}
+
+// parseCurrentBranch returns the name of the currently checked-out branch from
+// "git branch -a" output (the line prefixed with "* ").
+func parseCurrentBranch(output string) string {
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if strings.HasPrefix(line, "* ") {
+			return strings.TrimPrefix(line, "* ")
+		}
+	}
+	return ""
+}
+
+// parseBlameLine parses one line of "git blame --date=short" output.
+// Format: "hash (Author Name   YYYY-MM-DD  linenum) content"
+func parseBlameLine(line string) (blameLine, bool) {
+	paren := strings.Index(line, "(")
+	close := strings.Index(line, ")")
+	if paren < 0 || close < 0 || close < paren {
+		return blameLine{}, false
+	}
+	hash := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line[:paren]), "^"))
+	if len(hash) > 7 {
+		hash = hash[:7]
+	}
+	meta := strings.Fields(line[paren+1 : close])
+	if len(meta) < 3 {
+		return blameLine{}, false
+	}
+	// last field: line number; second-to-last: date; rest: author
+	lineNum, err := strconv.Atoi(meta[len(meta)-1])
+	if err != nil {
+		return blameLine{}, false
+	}
+	date := meta[len(meta)-2]
+	author := strings.Join(meta[:len(meta)-2], " ")
+	var text string
+	if close+2 <= len(line) {
+		text = line[close+2:]
+	} else if close+1 < len(line) {
+		text = line[close+1:]
+	}
+	return blameLine{
+		shortHash: hash,
+		author:    author,
+		date:      date,
+		lineNum:   lineNum,
+		text:      text,
+	}, true
+}
+
+// parseBlame parses all lines from "git blame --date=short" output,
+// skipping any lines that don't match the expected format.
+func parseBlame(output string) []blameLine {
+	var lines []blameLine
+	for _, line := range strings.Split(output, "\n") {
+		if bl, ok := parseBlameLine(line); ok {
+			lines = append(lines, bl)
+		}
+	}
+	return lines
+}
+
+// currentFile returns the path of the file whose diff section is currently
+// visible, based on the last fileItem whose diffIdx is <= diffOffset.
+func currentFile(m model) string {
+	if len(m.fileItems) == 0 {
+		return ""
+	}
+	cur := m.fileItems[0].path
+	for _, fi := range m.fileItems {
+		if fi.diffIdx <= m.diffOffset {
+			cur = fi.path
+		}
+	}
+	return cur
+}
+
+// parseCount converts a digit string to a navigation count.
+// Empty string or zero returns 1; values above 200 are capped.
+func parseCount(s string) int {
+	if s == "" {
+		return 1
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n <= 0 {
+		return 1
+	}
+	if n > 200 {
+		return 200
+	}
+	return n
+}
+
+// toggleBranchView shows or hides the branch picker in the left panel.
+// Hiding resets branchCursor.
+func toggleBranchView(m model) model {
+	m.showBranch = !m.showBranch
+	if !m.showBranch {
+		m.branchCursor = 0
 	}
 	return m
 }

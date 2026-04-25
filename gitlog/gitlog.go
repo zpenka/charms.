@@ -26,18 +26,28 @@ var (
 	alertStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D")).Bold(true)
 	divStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
 	focusIndStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD93D"))
+	lineNumStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
 	selectedBg    = lipgloss.Color("#2A2A2A")
 )
 
 type commitsLoadedMsg []commit
 type diffLoadedMsg []diffLine
+type branchesLoadedMsg struct {
+	branches []string
+	current  string
+}
+type blameLoadedMsg []blameLine
 type flashClearMsg struct{}
 type editorDoneMsg struct{}
 
-func fetchCommits(repoPath string) tea.Cmd {
+func fetchCommits(repoPath, ref string) tea.Cmd {
 	return func() tea.Msg {
-		out, err := exec.Command("git", "-C", repoPath, "log",
-			"--format=%H%x00%h%x00%an%x00%ar%x00%s", "-n", "200").Output()
+		args := []string{"-C", repoPath, "log",
+			"--format=%H%x00%h%x00%an%x00%ar%x00%s", "-n", "200"}
+		if ref != "" {
+			args = append(args, ref)
+		}
+		out, err := exec.Command("git", args...).Output()
 		if err != nil {
 			return commitsLoadedMsg(nil)
 		}
@@ -56,13 +66,37 @@ func fetchDiff(repoPath, hash string) tea.Cmd {
 	}
 }
 
+func fetchBranches(repoPath string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := exec.Command("git", "-C", repoPath, "branch", "-a").Output()
+		if err != nil {
+			return branchesLoadedMsg{}
+		}
+		s := string(out)
+		return branchesLoadedMsg{
+			branches: parseBranches(s),
+			current:  parseCurrentBranch(s),
+		}
+	}
+}
+
+func fetchBlame(repoPath, hash, file string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := exec.Command("git", "-C", repoPath, "blame",
+			"--date=short", hash, "--", file).Output()
+		if err != nil {
+			return blameLoadedMsg(nil)
+		}
+		return blameLoadedMsg(parseBlame(string(out)))
+	}
+}
+
 func flashCmd() tea.Cmd {
 	return tea.Tick(1500*time.Millisecond, func(time.Time) tea.Msg {
 		return flashClearMsg{}
 	})
 }
 
-// copyToClipboard tries common clipboard tools in order.
 func copyToClipboard(s string) error {
 	for _, args := range [][]string{
 		{"pbcopy"},
@@ -79,7 +113,6 @@ func copyToClipboard(s string) error {
 	return fmt.Errorf("no clipboard tool found")
 }
 
-// openInEditor writes the diff to a temp file and opens $EDITOR on it.
 func openInEditor(repoPath, hash string) tea.Cmd {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
@@ -102,7 +135,7 @@ func openInEditor(repoPath, hash string) tea.Cmd {
 }
 
 func (m model) Init() tea.Cmd {
-	return fetchCommits(m.repoPath)
+	return fetchCommits(m.repoPath, "")
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -114,6 +147,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case commitsLoadedMsg:
 		m.commits = []commit(msg)
+		m.cursor = 0
 		vc := visibleCommits(m)
 		if len(vc) > 0 {
 			m.loading = true
@@ -127,6 +161,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.diffOffset = 0
 		m.fileItems = parseFileItems(m.diffLines)
 		m.fileCursor = 0
+		m.showBlame = false
+		return m, nil
+
+	case branchesLoadedMsg:
+		m.branches = msg.branches
+		m.currentBranch = msg.current
+		// position cursor on current branch
+		for i, b := range m.branches {
+			if b == msg.current {
+				m.branchCursor = i
+				break
+			}
+		}
+		m.showBranch = true
+		return m, nil
+
+	case blameLoadedMsg:
+		m.loading = false
+		m.blameLines = []blameLine(msg)
+		m.blameOffset = 0
+		m.showBlame = true
 		return m, nil
 
 	case flashClearMsg:
@@ -146,7 +201,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
-	// Search mode: all keys feed the query
+	// Blame view: all navigation goes to blame scrolling
+	if m.showBlame {
+		panelH := diffPanelHeight(m)
+		switch km.String() {
+		case "q":
+			return m, tea.Quit
+		case "j", "down":
+			maxOff := len(m.blameLines) - panelH
+			if maxOff < 0 {
+				maxOff = 0
+			}
+			if m.blameOffset < maxOff {
+				m.blameOffset++
+			}
+		case "k", "up":
+			if m.blameOffset > 0 {
+				m.blameOffset--
+			}
+		case "d", " ":
+			maxOff := len(m.blameLines) - panelH
+			if maxOff < 0 {
+				maxOff = 0
+			}
+			m.blameOffset += panelH / 2
+			if m.blameOffset > maxOff {
+				m.blameOffset = maxOff
+			}
+		case "u":
+			m.blameOffset -= panelH / 2
+			if m.blameOffset < 0 {
+				m.blameOffset = 0
+			}
+		case "g":
+			m.blameOffset = 0
+		case "G":
+			m.blameOffset = len(m.blameLines)
+		case "B", "esc":
+			m.showBlame = false
+			// restore diff to the blamed file's position
+			for _, fi := range m.fileItems {
+				if fi.path == currentFile(m) {
+					m = scrollToDiffLine(m, fi.diffIdx)
+					break
+				}
+			}
+		}
+		return m, nil
+	}
+
+	// Search mode
 	if m.searching {
 		switch km.Type {
 		case tea.KeyEsc:
@@ -187,23 +291,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	vc := visibleCommits(m)
 
-	// Global bindings
+	// Global bindings (work in any panel mode)
 	switch km.String() {
 	case "q":
 		return m, tea.Quit
 	case "tab":
-		if m.showFiles {
+		switch {
+		case m.showBranch:
+			m = toggleBranchView(m)
+		case m.showFiles:
 			m = toggleFileView(m)
-		} else {
+		default:
 			m = switchPanel(m)
 		}
+		m.countBuf = ""
 		return m, nil
 	case "/":
 		m.searching = true
+		m.countBuf = ""
 		return m, nil
 	case "f":
 		if len(m.fileItems) > 0 || m.showFiles {
 			m = toggleFileView(m)
+			m.showBranch = false
+		}
+		m.countBuf = ""
+		return m, nil
+	case "b":
+		if !m.showBranch {
+			m.showFiles = false
+			m.countBuf = ""
+			return m, fetchBranches(m.repoPath)
+		}
+		m = toggleBranchView(m)
+		m.countBuf = ""
+		return m, nil
+	case "B":
+		if file := currentFile(m); file != "" && len(vc) > 0 {
+			m.loading = true
+			m.countBuf = ""
+			return m, fetchBlame(m.repoPath, vc[m.cursor].hash, file)
 		}
 		return m, nil
 	case "y":
@@ -213,11 +340,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.flash = "copied " + vc[m.cursor].shortHash
 			}
+			m.countBuf = ""
 			return m, flashCmd()
 		}
 		return m, nil
 	case "e":
 		if m.cursor < len(vc) {
+			m.countBuf = ""
 			return m, openInEditor(m.repoPath, vc[m.cursor].hash)
 		}
 		return m, nil
@@ -225,7 +354,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	panelH := diffPanelHeight(m)
 
-	// File list navigation (overrides normal panel nav)
+	// Branch picker navigation
+	if m.showBranch {
+		switch km.String() {
+		case "j", "down":
+			if m.branchCursor < len(m.branches)-1 {
+				m.branchCursor++
+			}
+		case "k", "up":
+			if m.branchCursor > 0 {
+				m.branchCursor--
+			}
+		case "enter", " ":
+			if m.branchCursor < len(m.branches) {
+				selected := m.branches[m.branchCursor]
+				m.currentRef = selected
+				m.showBranch = false
+				m.cursor = 0
+				m.query = ""
+				m.loading = true
+				return m, fetchCommits(m.repoPath, selected)
+			}
+		case "esc":
+			m = toggleBranchView(m)
+		}
+		return m, nil
+	}
+
+	// File list navigation
 	if m.showFiles {
 		switch km.String() {
 		case "j", "down":
@@ -249,17 +405,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.focus == panelList {
+		// Digit accumulation for count prefix
+		if len(km.String()) == 1 && km.String() >= "0" && km.String() <= "9" {
+			m.countBuf += km.String()
+			return m, nil
+		}
+		n := parseCount(m.countBuf)
+		m.countBuf = ""
+
 		switch km.String() {
 		case "j", "down":
-			if m.cursor < len(vc)-1 {
-				m.cursor++
+			newCursor := m.cursor + n
+			if newCursor >= len(vc) {
+				newCursor = len(vc) - 1
+			}
+			if newCursor >= 0 && newCursor != m.cursor {
+				m.cursor = newCursor
 				m.diffOffset = 0
 				m.loading = true
 				return m, fetchDiff(m.repoPath, vc[m.cursor].hash)
 			}
 		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
+			newCursor := m.cursor - n
+			if newCursor < 0 {
+				newCursor = 0
+			}
+			if newCursor != m.cursor {
+				m.cursor = newCursor
 				m.diffOffset = 0
 				m.loading = true
 				return m, fetchDiff(m.repoPath, vc[m.cursor].hash)
@@ -282,6 +454,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = switchPanel(m)
 		}
 	} else {
+		m.countBuf = ""
 		switch km.String() {
 		case "j", "down":
 			return scrollDiffDown(m, 1), nil
@@ -318,6 +491,10 @@ func (m model) View() string {
 	// Title bar
 	sb.WriteString("\n ")
 	sb.WriteString(titleStyle.Render("git log"))
+	if m.currentRef != "" {
+		sb.WriteString("  ")
+		sb.WriteString(hashStyle.Render(m.currentRef))
+	}
 	sb.WriteString("  ")
 	sb.WriteString(msgStyle.Render(m.repoPath))
 	sb.WriteString("\n\n")
@@ -325,13 +502,12 @@ func (m model) View() string {
 	// Left panel header
 	var listHdr string
 	switch {
+	case m.showBranch:
+		hdrText := fmt.Sprintf("Branches (%d)", len(m.branches))
+		listHdr = focusIndStyle.Render("▌") + " " + titleStyle.Render(hdrText)
 	case m.showFiles:
 		hdrText := fmt.Sprintf("Files (%d)", len(m.fileItems))
-		if m.focus == panelList || m.showFiles {
-			listHdr = focusIndStyle.Render("▌") + " " + titleStyle.Render(hdrText)
-		} else {
-			listHdr = "  " + msgStyle.Render(hdrText)
-		}
+		listHdr = focusIndStyle.Render("▌") + " " + titleStyle.Render(hdrText)
 	case m.query != "":
 		hdrText := fmt.Sprintf("Commits [/%s] %d", m.query, len(vc))
 		if m.focus == panelList {
@@ -348,22 +524,29 @@ func (m model) View() string {
 	}
 
 	// Right panel header
-	var diffHdrContent string
+	var diffHdr string
 	switch {
+	case m.showBlame:
+		file := currentFile(m)
+		hdrText := hashStyle.Render("blame") + "  " + msgStyle.Render(file)
+		if m.focus == panelDiff {
+			diffHdr = focusIndStyle.Render("▌") + " " + hdrText
+		} else {
+			diffHdr = "  " + hdrText
+		}
 	case m.loading:
-		diffHdrContent = msgStyle.Render("loading…")
+		diffHdr = "  " + msgStyle.Render("loading…")
 	case len(vc) == 0:
-		diffHdrContent = msgStyle.Render("no commits")
+		diffHdr = "  " + msgStyle.Render("no commits")
 	default:
 		c := vc[m.cursor]
-		diffHdrContent = hashStyle.Render(c.shortHash) + "  " +
+		hdrText := hashStyle.Render(c.shortHash) + "  " +
 			msgStyle.Render(truncate(c.subject, diffW-12))
-	}
-	var diffHdr string
-	if m.focus == panelDiff {
-		diffHdr = focusIndStyle.Render("▌") + " " + diffHdrContent
-	} else {
-		diffHdr = "  " + diffHdrContent
+		if m.focus == panelDiff {
+			diffHdr = focusIndStyle.Render("▌") + " " + hdrText
+		} else {
+			diffHdr = "  " + hdrText
+		}
 	}
 
 	sb.WriteString(lipgloss.NewStyle().Width(listW).Render(listHdr))
@@ -371,7 +554,7 @@ func (m model) View() string {
 	sb.WriteString(diffHdr)
 	sb.WriteString("\n")
 
-	// Visible commit window (keep cursor centred)
+	// Windowed commit list
 	commitStart := m.cursor - panelH/2
 	if commitStart < 0 {
 		commitStart = 0
@@ -383,7 +566,7 @@ func (m model) View() string {
 		}
 	}
 
-	// Visible file window (keep fileCursor centred)
+	// Windowed file list
 	fileStart := m.fileCursor - panelH/2
 	if fileStart < 0 {
 		fileStart = 0
@@ -395,32 +578,61 @@ func (m model) View() string {
 		}
 	}
 
+	// Windowed branch list
+	branchStart := m.branchCursor - panelH/2
+	if branchStart < 0 {
+		branchStart = 0
+	}
+	if branchStart+panelH > len(m.branches) {
+		branchStart = len(m.branches) - panelH
+		if branchStart < 0 {
+			branchStart = 0
+		}
+	}
+
 	for i := 0; i < panelH; i++ {
 		var leftLine string
-		if m.showFiles {
+		switch {
+		case m.showBranch:
+			leftLine = renderBranchRow(m, branchStart+i, listW)
+		case m.showFiles:
 			leftLine = renderFileRow(m, fileStart+i, listW)
-		} else {
+		default:
 			leftLine = renderCommitRow(m, vc, commitStart+i, listW)
 		}
+
+		var rightLine string
+		if m.showBlame {
+			rightLine = renderBlameRow(m, m.blameOffset+i, diffW)
+		} else {
+			rightLine = renderDiffRow(m, m.diffOffset+i, diffW)
+		}
+
 		sb.WriteString(leftLine)
 		sb.WriteString(divStyle.Render("│"))
-		sb.WriteString(renderDiffRow(m, m.diffOffset+i, diffW))
+		sb.WriteString(rightLine)
 		sb.WriteString("\n")
 	}
 
-	// Footer / hint
+	// Footer
 	sb.WriteString("\n ")
 	switch {
 	case m.flash != "":
 		sb.WriteString(alertStyle.Render(m.flash))
 	case m.searching:
 		sb.WriteString(msgStyle.Render("[/] " + m.query + "█   Esc clear   Enter confirm"))
+	case m.countBuf != "":
+		sb.WriteString(msgStyle.Render(fmt.Sprintf("[%s] j/k  jump   other key  cancel", m.countBuf)))
+	case m.showBlame:
+		sb.WriteString(msgStyle.Render("j/k  scroll   d/u  half-page   g/G  top/bottom   B/Esc  back to diff"))
+	case m.showBranch:
+		sb.WriteString(msgStyle.Render("j/k  navigate   Enter  switch branch   b/Esc  back"))
 	case m.showFiles:
 		sb.WriteString(msgStyle.Render("j/k  navigate   Enter  jump to file   f/Esc  back"))
 	case m.focus == panelDiff:
 		sb.WriteString(msgStyle.Render("j/k  scroll   d/u  half-page   g/G  top/bottom   h/Tab  commits   q  quit"))
 	default:
-		sb.WriteString(msgStyle.Render("j/k  navigate   l/Tab  diff   /  search   f  files   y  copy hash   e  editor   g/G  top/bottom   q  quit"))
+		sb.WriteString(msgStyle.Render("j/k  navigate   5j  jump 5   l/Tab  diff   /  search   f  files   b  branches   B  blame   y  copy   e  editor   q  quit"))
 	}
 	sb.WriteString("\n\n")
 
@@ -428,7 +640,6 @@ func (m model) View() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
 
-// renderCommitRow renders one row of the commit list panel at index idx into vc.
 func renderCommitRow(m model, vc []commit, idx int, w int) string {
 	const (
 		cursorW = 2
@@ -440,46 +651,62 @@ func renderCommitRow(m model, vc []commit, idx int, w int) string {
 	if subjectW < 4 {
 		subjectW = 4
 	}
-
 	if idx < 0 || idx >= len(vc) {
 		return lipgloss.NewStyle().Width(w).Render("")
 	}
-
 	c := vc[idx]
 	selected := idx == m.cursor
 
 	bg := func(st lipgloss.Style) lipgloss.Style {
-		if selected && m.focus == panelList {
+		if selected && m.focus == panelList && !m.showBranch && !m.showFiles {
 			return st.Background(selectedBg)
 		}
 		return st
 	}
-
 	var cur string
 	if idx == m.cursor {
 		cur = bg(cursorStyle).Width(cursorW).Render("▶")
 	} else {
 		cur = bg(lipgloss.NewStyle()).Width(cursorW).Render("")
 	}
-
 	hash := bg(hashStyle).Width(hashW + 1).Render(c.shortHash)
 	subj := bg(subjStyle).Width(subjectW + 1).Render(truncate(c.subject, subjectW))
 	auth := bg(authorStyle).Width(authW + 1).Render(truncate(firstWord(c.author), authW))
 	when := bg(whenStyle).Width(whenW).Render(truncate(c.when, whenW))
-
 	return cur + hash + subj + auth + when
 }
 
-// renderFileRow renders one row of the file list panel.
 func renderFileRow(m model, idx int, w int) string {
 	const cursorW = 2
-
 	if idx < 0 || idx >= len(m.fileItems) {
 		return lipgloss.NewStyle().Width(w).Render("")
 	}
-
 	fi := m.fileItems[idx]
 	selected := idx == m.fileCursor
+	bg := func(st lipgloss.Style) lipgloss.Style {
+		if selected {
+			return st.Background(selectedBg)
+		}
+		return st
+	}
+	var cur string
+	if selected {
+		cur = bg(cursorStyle).Width(cursorW).Render("▶")
+	} else {
+		cur = bg(lipgloss.NewStyle()).Width(cursorW).Render("")
+	}
+	path := bg(subjStyle).Width(w - cursorW).Render(truncate(fi.path, w-cursorW))
+	return cur + path
+}
+
+func renderBranchRow(m model, idx int, w int) string {
+	const cursorW = 2
+	if idx < 0 || idx >= len(m.branches) {
+		return lipgloss.NewStyle().Width(w).Render("")
+	}
+	name := m.branches[idx]
+	selected := idx == m.branchCursor
+	isCurrent := name == m.currentBranch
 
 	bg := func(st lipgloss.Style) lipgloss.Style {
 		if selected {
@@ -487,7 +714,6 @@ func renderFileRow(m model, idx int, w int) string {
 		}
 		return st
 	}
-
 	var cur string
 	if selected {
 		cur = bg(cursorStyle).Width(cursorW).Render("▶")
@@ -495,11 +721,42 @@ func renderFileRow(m model, idx int, w int) string {
 		cur = bg(lipgloss.NewStyle()).Width(cursorW).Render("")
 	}
 
-	path := bg(subjStyle).Width(w - cursorW).Render(truncate(fi.path, w-cursorW))
-	return cur + path
+	nameW := w - cursorW - 2
+	if nameW < 4 {
+		nameW = 4
+	}
+	label := truncate(name, nameW)
+	var marker string
+	if isCurrent {
+		marker = bg(alertStyle).Width(2).Render("●")
+	} else {
+		marker = bg(lipgloss.NewStyle()).Width(2).Render("")
+	}
+	text := bg(subjStyle).Width(nameW).Render(label)
+	return cur + text + marker
 }
 
-// renderDiffRow renders one line of the diff panel.
+func renderBlameRow(m model, idx int, w int) string {
+	if idx < 0 || idx >= len(m.blameLines) {
+		return ""
+	}
+	bl := m.blameLines[idx]
+	const hashW = 7
+	const authW = 12
+	const dateW = 10
+	const numW = 5
+	contentW := w - hashW - 1 - authW - 1 - dateW - 1 - numW - 1
+	if contentW < 4 {
+		contentW = 4
+	}
+	hash := hashStyle.Width(hashW + 1).Render(bl.shortHash)
+	auth := authorStyle.Width(authW + 1).Render(truncate(bl.author, authW))
+	date := whenStyle.Width(dateW + 1).Render(bl.date)
+	num := lineNumStyle.Width(numW + 1).Render(fmt.Sprintf("%d", bl.lineNum))
+	text := truncate(bl.text, contentW)
+	return hash + auth + date + num + text
+}
+
 func renderDiffRow(m model, idx int, w int) string {
 	if idx < 0 || idx >= len(m.diffLines) {
 		return ""
@@ -520,7 +777,6 @@ func renderDiffRow(m model, idx int, w int) string {
 	}
 }
 
-// firstVisibleHash returns the hash of the first commit in the current filtered view.
 func firstVisibleHash(m model) string {
 	vc := visibleCommits(m)
 	if len(vc) == 0 {

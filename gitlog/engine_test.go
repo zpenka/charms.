@@ -537,3 +537,239 @@ func TestToggleFileView_Hide(t *testing.T) {
 		t.Error("expected fileCursor reset to 0 on hide")
 	}
 }
+
+// --- parseBranches ---
+
+func TestParseBranches_Simple(t *testing.T) {
+	input := "  main\n* develop\n  remotes/origin/main\n"
+	branches := parseBranches(input)
+	if len(branches) != 3 {
+		t.Fatalf("expected 3, got %d: %v", len(branches), branches)
+	}
+	if branches[0] != "main" {
+		t.Errorf("first: got %q", branches[0])
+	}
+	if branches[1] != "develop" {
+		t.Errorf("second: got %q", branches[1])
+	}
+}
+
+func TestParseBranches_Empty(t *testing.T) {
+	if parseBranches("") != nil {
+		t.Error("expected nil for empty input")
+	}
+}
+
+func TestParseBranches_SkipsRefPointers(t *testing.T) {
+	input := "  main\n  remotes/origin/HEAD -> origin/main\n  remotes/origin/main\n"
+	branches := parseBranches(input)
+	for _, b := range branches {
+		if strings.Contains(b, "->") {
+			t.Errorf("should skip ref pointer lines, got %q", b)
+		}
+	}
+}
+
+func TestParseBranches_SkipsEmpty(t *testing.T) {
+	input := "  main\n\n  develop\n"
+	branches := parseBranches(input)
+	if len(branches) != 2 {
+		t.Errorf("expected 2, got %d", len(branches))
+	}
+}
+
+// --- parseCurrentBranch ---
+
+func TestParseCurrentBranch_Found(t *testing.T) {
+	input := "  main\n* develop\n  remotes/origin/main\n"
+	if got := parseCurrentBranch(input); got != "develop" {
+		t.Errorf("expected develop, got %q", got)
+	}
+}
+
+func TestParseCurrentBranch_Detached(t *testing.T) {
+	input := "* (HEAD detached at abc1234)\n  main\n"
+	got := parseCurrentBranch(input)
+	// detached HEAD is still returned as-is so the model can display it
+	if got == "" {
+		t.Error("expected non-empty for detached HEAD")
+	}
+}
+
+func TestParseCurrentBranch_None(t *testing.T) {
+	if got := parseCurrentBranch("  main\n  develop\n"); got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
+// --- parseBlameLine ---
+
+func TestParseBlameLine_Valid(t *testing.T) {
+	line := "abc1234a (John Doe        2024-01-15   42) func main() {"
+	bl, ok := parseBlameLine(line)
+	if !ok {
+		t.Fatal("expected ok=true")
+	}
+	if bl.shortHash != "abc1234" {
+		t.Errorf("shortHash: got %q", bl.shortHash)
+	}
+	if bl.author != "John Doe" {
+		t.Errorf("author: got %q", bl.author)
+	}
+	if bl.date != "2024-01-15" {
+		t.Errorf("date: got %q", bl.date)
+	}
+	if bl.lineNum != 42 {
+		t.Errorf("lineNum: got %d", bl.lineNum)
+	}
+	if bl.text != "func main() {" {
+		t.Errorf("text: got %q", bl.text)
+	}
+}
+
+func TestParseBlameLine_BoundaryCommit(t *testing.T) {
+	// git prefixes boundary commits with ^
+	line := "^abc1234 (Author Name      2024-01-01    1) first line"
+	bl, ok := parseBlameLine(line)
+	if !ok {
+		t.Fatal("expected ok=true")
+	}
+	if strings.HasPrefix(bl.shortHash, "^") {
+		t.Error("shortHash should not start with ^")
+	}
+}
+
+func TestParseBlameLine_Invalid(t *testing.T) {
+	_, ok := parseBlameLine("not a blame line at all")
+	if ok {
+		t.Error("expected ok=false for malformed line")
+	}
+}
+
+func TestParseBlameLine_EmptyContent(t *testing.T) {
+	line := "abc1234a (Author     2024-01-01    1)"
+	bl, ok := parseBlameLine(line)
+	if !ok {
+		t.Fatal("expected ok=true")
+	}
+	if bl.text != "" {
+		t.Errorf("expected empty text, got %q", bl.text)
+	}
+}
+
+// --- parseBlame ---
+
+func TestParseBlame_MultiLine(t *testing.T) {
+	input := "abc1234a (John Doe   2024-01-15    1) line one\n" +
+		"def5678b (Jane Smith  2024-01-16    2) line two\n"
+	lines := parseBlame(input)
+	if len(lines) != 2 {
+		t.Fatalf("expected 2, got %d", len(lines))
+	}
+	if lines[0].lineNum != 1 || lines[1].lineNum != 2 {
+		t.Errorf("wrong line numbers: %d %d", lines[0].lineNum, lines[1].lineNum)
+	}
+}
+
+func TestParseBlame_SkipsMalformed(t *testing.T) {
+	input := "abc1234a (Author  2024-01-01  1) good\nbad line\ndef5678b (Author  2024-01-02  2) also good\n"
+	lines := parseBlame(input)
+	if len(lines) != 2 {
+		t.Errorf("expected 2 valid lines, got %d", len(lines))
+	}
+}
+
+// --- currentFile ---
+
+func TestCurrentFile_Empty(t *testing.T) {
+	m := model{}
+	if currentFile(m) != "" {
+		t.Error("expected empty string with no fileItems")
+	}
+}
+
+func TestCurrentFile_AtStart(t *testing.T) {
+	m := model{
+		fileItems:  []fileItem{{path: "a.go", diffIdx: 0}, {path: "b.go", diffIdx: 20}},
+		diffOffset: 0,
+	}
+	if got := currentFile(m); got != "a.go" {
+		t.Errorf("expected a.go, got %q", got)
+	}
+}
+
+func TestCurrentFile_PastBoundary(t *testing.T) {
+	m := model{
+		fileItems:  []fileItem{{path: "a.go", diffIdx: 0}, {path: "b.go", diffIdx: 20}},
+		diffOffset: 25,
+	}
+	if got := currentFile(m); got != "b.go" {
+		t.Errorf("expected b.go, got %q", got)
+	}
+}
+
+func TestCurrentFile_ExactlyAtBoundary(t *testing.T) {
+	m := model{
+		fileItems:  []fileItem{{path: "a.go", diffIdx: 0}, {path: "b.go", diffIdx: 20}},
+		diffOffset: 20,
+	}
+	if got := currentFile(m); got != "b.go" {
+		t.Errorf("expected b.go at exact boundary, got %q", got)
+	}
+}
+
+// --- parseCount ---
+
+func TestParseCount_Empty(t *testing.T) {
+	if parseCount("") != 1 {
+		t.Error("empty should return 1")
+	}
+}
+
+func TestParseCount_Valid(t *testing.T) {
+	if parseCount("5") != 5 {
+		t.Errorf("expected 5, got %d", parseCount("5"))
+	}
+	if parseCount("12") != 12 {
+		t.Errorf("expected 12, got %d", parseCount("12"))
+	}
+}
+
+func TestParseCount_Zero(t *testing.T) {
+	if parseCount("0") != 1 {
+		t.Error("zero should return 1")
+	}
+}
+
+func TestParseCount_Capped(t *testing.T) {
+	if parseCount("9999") != 200 {
+		t.Errorf("expected cap at 200, got %d", parseCount("9999"))
+	}
+}
+
+func TestParseCount_Invalid(t *testing.T) {
+	if parseCount("abc") != 1 {
+		t.Error("invalid should return 1")
+	}
+}
+
+// --- toggleBranchView ---
+
+func TestToggleBranchView_Show(t *testing.T) {
+	m := model{showBranch: false}
+	m = toggleBranchView(m)
+	if !m.showBranch {
+		t.Error("expected showBranch=true")
+	}
+}
+
+func TestToggleBranchView_Hide(t *testing.T) {
+	m := model{showBranch: true, branchCursor: 3}
+	m = toggleBranchView(m)
+	if m.showBranch {
+		t.Error("expected showBranch=false")
+	}
+	if m.branchCursor != 0 {
+		t.Error("expected branchCursor reset to 0")
+	}
+}
