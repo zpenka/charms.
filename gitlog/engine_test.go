@@ -2164,3 +2164,405 @@ func TestExitCommentMode_ClearsInput(t *testing.T) {
 		t.Errorf("should clear input, got %q", m.commentInput)
 	}
 }
+
+// ===== OPTION A: ADVANCED COMMIT OPERATIONS =====
+
+// --- Interactive Rebase ---
+
+func TestParseRebaseSequence_Empty(t *testing.T) {
+	seq := parseRebaseSequence([]commit{})
+	if len(seq) != 0 {
+		t.Errorf("empty commits should have no sequence, got %d", len(seq))
+	}
+}
+
+func TestParseRebaseSequence_Linear(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "first"},
+		{hash: "bbb", subject: "second"},
+		{hash: "ccc", subject: "third"},
+	}
+	seq := parseRebaseSequence(commits)
+	if len(seq) != 3 {
+		t.Errorf("expected 3 operations, got %d", len(seq))
+	}
+}
+
+func TestReorderCommit_ValidIndex(t *testing.T) {
+	seq := []rebaseOp{
+		{action: "pick", hash: "aaa", subject: "first"},
+		{action: "pick", hash: "bbb", subject: "second"},
+	}
+	seq = reorderCommit(seq, 0, 1)
+	if seq[0].hash != "bbb" {
+		t.Errorf("should reorder, got %s", seq[0].hash)
+	}
+}
+
+func TestSquashCommit_CombinesMsgs(t *testing.T) {
+	seq := []rebaseOp{
+		{action: "pick", hash: "aaa", subject: "first"},
+		{action: "pick", hash: "bbb", subject: "second"},
+	}
+	seq = squashCommit(seq, 1)
+	if seq[1].action != "squash" {
+		t.Errorf("should mark as squash, got %q", seq[1].action)
+	}
+}
+
+func TestFixupCommit_DiscardMsg(t *testing.T) {
+	seq := []rebaseOp{
+		{action: "pick", hash: "aaa", subject: "first"},
+		{action: "pick", hash: "bbb", subject: "fixup"},
+	}
+	seq = fixupCommit(seq, 1)
+	if seq[1].action != "fixup" {
+		t.Errorf("should mark as fixup, got %q", seq[1].action)
+	}
+}
+
+func TestPreviewRebase_ShowsResult(t *testing.T) {
+	seq := []rebaseOp{
+		{action: "pick", hash: "aaa", subject: "first"},
+		{action: "squash", hash: "bbb", subject: "second"},
+	}
+	preview := previewRebase(seq)
+	if preview == "" {
+		t.Error("should generate non-empty preview")
+	}
+}
+
+// --- Cherry-pick ---
+
+func TestSelectForCherryPick_AddToList(t *testing.T) {
+	m := model{cherryPickList: []string{}}
+	m = toggleCherryPick(m, "abc1234")
+	if len(m.cherryPickList) != 1 {
+		t.Errorf("should add to list, got %d", len(m.cherryPickList))
+	}
+}
+
+func TestSelectForCherryPick_RemoveFromList(t *testing.T) {
+	m := model{cherryPickList: []string{"abc1234"}}
+	m = toggleCherryPick(m, "abc1234")
+	if len(m.cherryPickList) != 0 {
+		t.Errorf("should remove from list, got %d", len(m.cherryPickList))
+	}
+}
+
+func TestPreviewCherryPick_ShowsSequence(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "first"},
+		{hash: "bbb", subject: "second"},
+	}
+	picks := []string{"aaa", "bbb"}
+	preview := previewCherryPick(commits, picks)
+	if preview == "" {
+		t.Error("should generate non-empty preview")
+	}
+}
+
+// --- Reset ---
+
+func TestResetToCommit_SoftMode(t *testing.T) {
+	result := resetToCommit("abc1234", "soft")
+	if result == "" {
+		t.Error("should generate reset command")
+	}
+}
+
+func TestResetToCommit_MixedMode(t *testing.T) {
+	result := resetToCommit("abc1234", "mixed")
+	if result == "" {
+		t.Error("should generate reset command")
+	}
+}
+
+func TestResetToCommit_HardMode(t *testing.T) {
+	result := resetToCommit("abc1234", "hard")
+	if result == "" {
+		t.Error("should generate reset command")
+	}
+}
+
+// --- Revert ---
+
+func TestRevertCommit_GeneratesCmd(t *testing.T) {
+	cmd := revertCommit("abc1234")
+	if cmd == "" {
+		t.Error("should generate revert command")
+	}
+	if !strings.Contains(cmd, "abc1234") {
+		t.Errorf("should contain hash, got %q", cmd)
+	}
+}
+
+func TestRevertCommit_WithMessage(t *testing.T) {
+	cmd := revertCommit("abc1234")
+	if !strings.Contains(cmd, "revert") {
+		t.Errorf("should be revert command, got %q", cmd)
+	}
+}
+
+// --- Amend ---
+
+func TestAmendLastCommit_WithMessage(t *testing.T) {
+	m := model{
+		commits: []commit{
+			{hash: "abc1234", subject: "old message"},
+		},
+		cursor: 0,
+	}
+	amended := amendLastCommit(m, "new message")
+	if amended.commits[0].subject == "old message" {
+		t.Error("should update subject")
+	}
+}
+
+func TestAmendLastCommit_PreservesMetadata(t *testing.T) {
+	m := model{
+		commits: []commit{
+			{hash: "abc1234", author: "John", subject: "old"},
+		},
+		cursor: 0,
+	}
+	amended := amendLastCommit(m, "new")
+	if amended.commits[0].author != "John" {
+		t.Error("should preserve author")
+	}
+}
+
+// ===== OPTION B: COLLABORATION & ANALYTICS =====
+
+// --- Author Statistics ---
+
+func TestAuthorStats_Empty(t *testing.T) {
+	stats := calculateAuthorStats([]commit{})
+	if len(stats) != 0 {
+		t.Errorf("empty commits should have no stats, got %d", len(stats))
+	}
+}
+
+func TestAuthorStats_SingleAuthor(t *testing.T) {
+	commits := []commit{
+		{author: "John", subject: "first"},
+		{author: "John", subject: "second"},
+		{author: "Jane", subject: "third"},
+	}
+	stats := calculateAuthorStats(commits)
+	if stats["John"] != 2 {
+		t.Errorf("John should have 2 commits, got %d", stats["John"])
+	}
+}
+
+func TestAuthorStats_MultipleAuthors(t *testing.T) {
+	commits := []commit{
+		{author: "John", subject: "first"},
+		{author: "Jane", subject: "second"},
+		{author: "Bob", subject: "third"},
+	}
+	stats := calculateAuthorStats(commits)
+	if len(stats) != 3 {
+		t.Errorf("expected 3 authors, got %d", len(stats))
+	}
+}
+
+func TestRenderAuthorStats_ShowsCount(t *testing.T) {
+	stats := map[string]int{
+		"John": 10,
+		"Jane": 5,
+		"Bob":  3,
+	}
+	output := renderAuthorStats(stats, 50)
+	if output == "" {
+		t.Error("should render non-empty output")
+	}
+	if !strings.Contains(output, "John") {
+		t.Errorf("should show author, got %q", output)
+	}
+}
+
+// --- Time-based Analytics ---
+
+func TestTimeBasedStats_Empty(t *testing.T) {
+	stats := calculateTimeStats([]commit{})
+	if len(stats) != 0 {
+		t.Errorf("empty commits should have no stats, got %d", len(stats))
+	}
+}
+
+func TestTimeBasedStats_ByDay(t *testing.T) {
+	commits := []commit{
+		{when: "1 day ago", subject: "today"},
+		{when: "1 day ago", subject: "also today"},
+		{when: "7 days ago", subject: "week ago"},
+	}
+	stats := calculateTimeStats(commits)
+	if len(stats) == 0 {
+		t.Error("should calculate time stats")
+	}
+}
+
+func TestCommitsPerWeek_Aggregates(t *testing.T) {
+	commits := []commit{
+		{when: "1 day ago", subject: "a"},
+		{when: "2 days ago", subject: "b"},
+		{when: "8 days ago", subject: "c"},
+	}
+	weekly := aggregateByWeek(commits)
+	if len(weekly) == 0 {
+		t.Error("should aggregate by week")
+	}
+}
+
+func TestRenderTimeStats_ShowsHeatmap(t *testing.T) {
+	stats := map[string]int{
+		"Mon": 5,
+		"Tue": 3,
+		"Wed": 7,
+	}
+	output := renderTimeStats(stats, 50)
+	if output == "" {
+		t.Error("should render non-empty output")
+	}
+}
+
+// --- Co-author Detection ---
+
+func TestExtractCoAuthors_None(t *testing.T) {
+	authors := extractCoAuthors("simple commit message")
+	if len(authors) != 0 {
+		t.Errorf("no co-authors should return empty, got %d", len(authors))
+	}
+}
+
+func TestExtractCoAuthors_Single(t *testing.T) {
+	msg := "Fix bug\n\nCo-authored-by: Jane Smith <jane@example.com>"
+	authors := extractCoAuthors(msg)
+	if len(authors) != 1 {
+		t.Errorf("expected 1 co-author, got %d", len(authors))
+	}
+	if !strings.Contains(authors[0], "Jane") {
+		t.Errorf("should contain name, got %q", authors[0])
+	}
+}
+
+func TestExtractCoAuthors_Multiple(t *testing.T) {
+	msg := "Fix bug\n\nCo-authored-by: Jane <jane@example.com>\nCo-authored-by: Bob <bob@example.com>"
+	authors := extractCoAuthors(msg)
+	if len(authors) != 2 {
+		t.Errorf("expected 2 co-authors, got %d", len(authors))
+	}
+}
+
+// --- Reviewer Tracking ---
+
+func TestExtractReviewers_None(t *testing.T) {
+	reviewers := extractReviewers("normal commit message")
+	if len(reviewers) != 0 {
+		t.Errorf("no reviewers should return empty, got %d", len(reviewers))
+	}
+}
+
+func TestExtractReviewers_Mentioned(t *testing.T) {
+	msg := "Fix: handle edge case\n\nReviewed-by: John Smith <john@example.com>"
+	reviewers := extractReviewers(msg)
+	if len(reviewers) != 1 {
+		t.Errorf("expected 1 reviewer, got %d", len(reviewers))
+	}
+}
+
+func TestExtractReviewers_Multiple(t *testing.T) {
+	msg := "Feature: new API\n\nReviewed-by: Alice <alice@ex.com>\nReviewed-by: Bob <bob@ex.com>"
+	reviewers := extractReviewers(msg)
+	if len(reviewers) != 2 {
+		t.Errorf("expected 2 reviewers, got %d", len(reviewers))
+	}
+}
+
+// --- Productivity Metrics ---
+
+func TestCalculateProductivity_Empty(t *testing.T) {
+	metrics := calculateProductivity([]commit{})
+	if len(metrics) != 0 {
+		t.Errorf("empty should have no metrics, got %d", len(metrics))
+	}
+}
+
+func TestCalculateProductivity_LineChanges(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "first"},
+		{hash: "bbb", subject: "second"},
+	}
+	// Would need diff data to calculate actual metrics
+	metrics := calculateProductivity(commits)
+	if metrics == nil {
+		t.Error("should return map")
+	}
+}
+
+func TestRenderProductivityMetrics_ShowsData(t *testing.T) {
+	metrics := map[string]interface{}{
+		"commits":      42,
+		"avg_files":    2.5,
+		"avg_additions": 15,
+	}
+	output := renderProductivityMetrics(metrics, 50)
+	if output == "" {
+		t.Error("should render non-empty output")
+	}
+}
+
+// --- UI Integration ---
+
+func TestKeyBinding_R_ShowRebase(t *testing.T) {
+	m := model{showRebaseUI: false}
+	m = handleKeyBinding(m, "R")
+	if !m.showRebaseUI {
+		t.Error("R should show rebase UI")
+	}
+}
+
+func TestKeyBinding_C_ShowCherryPick(t *testing.T) {
+	m := model{showCherryPickUI: false}
+	m = handleKeyBinding(m, "C")
+	if !m.showCherryPickUI {
+		t.Error("C should show cherry-pick UI")
+	}
+}
+
+func TestKeyBinding_A_ShowAnalytics(t *testing.T) {
+	m := model{showAnalytics: false}
+	m = handleKeyBinding(m, "A")
+	if !m.showAnalytics {
+		t.Error("A should show analytics")
+	}
+}
+
+func TestRenderRebaseUI_ShowsSequence(t *testing.T) {
+	m := model{
+		showRebaseUI: true,
+		commits: []commit{
+			{hash: "aaa", subject: "first"},
+			{hash: "bbb", subject: "second"},
+		},
+	}
+	output := renderRebaseUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty rebase UI")
+	}
+}
+
+func TestRenderAnalyticsPanel_ShowsStats(t *testing.T) {
+	m := model{
+		showAnalytics: true,
+		commits: []commit{
+			{author: "John", when: "1 day ago"},
+			{author: "Jane", when: "2 days ago"},
+		},
+	}
+	output := renderAnalyticsPanel(m, 50)
+	if output == "" {
+		t.Error("should render non-empty analytics")
+	}
+}
