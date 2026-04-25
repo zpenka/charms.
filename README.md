@@ -233,12 +233,27 @@ A two-panel TUI for browsing the git history of the current repository — commi
 |-----|--------|
 | `j` / `↓` | Move to next commit |
 | `k` / `↑` | Move to previous commit |
-| `g` / `G` | Jump to oldest / newest commit |
+| `g` / `G` | Jump to top / bottom of commit list |
 | `l` / `Tab` | Switch focus to diff panel |
 | `h` / `Tab` | Switch focus back to commit list |
 | `j` / `k` *(diff focused)* | Scroll diff one line |
 | `d` / `u` *(diff focused)* | Scroll diff half a page |
 | `g` / `G` *(diff focused)* | Jump to top / bottom of diff |
+| `/` | Enter search mode — filter commits by message, author, or hash |
+| `Esc` *(searching)* | Clear filter and exit search |
+| `Enter` *(searching)* | Confirm filter and exit search |
+| `f` | Toggle file list — shows files changed in the current commit |
+| `j` / `k` *(file list)* | Navigate files |
+| `Enter` *(file list)* | Jump to that file's diff and switch to diff panel |
+| `f` / `Esc` *(file list)* | Close file list |
+| `y` | Copy the current commit's full hash to the clipboard |
+| `e` | Open the current commit's diff in `$EDITOR` |
 | `q` | Quit to lobby |
 
 The diff panel shows `git show --stat --patch` output for the selected commit, colour-coded: green for additions, red for removals, cyan for hunk headers, grey for file metadata. The commit list auto-scrolls to keep the cursor centred. Up to 200 commits are loaded on launch; diffs are fetched asynchronously as you navigate.
+
+**Search:** press `/` to enter search mode. Typing filters the commit list live by subject, author name, or short hash. `Esc` clears the filter; `Enter` keeps it and returns to normal navigation. The header shows `[/query] N` with the match count while a filter is active.
+
+**File list:** press `f` to replace the commit list with the list of files changed in the current commit. Navigate with `j`/`k` and press `Enter` to jump directly to that file's section in the diff. Press `f` or `Esc` to return to the commit list.
+
+**Clipboard:** `y` copies the full 40-character commit hash. Requires `pbcopy` (macOS), `wl-copy` (Wayland), `xclip`, or `xsel` to be installed.

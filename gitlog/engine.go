@@ -1,6 +1,8 @@
 package gitlog
 
-import "strings"
+import (
+	"strings"
+)
 
 type commit struct {
 	hash      string
@@ -32,12 +34,23 @@ type diffLine struct {
 	text string
 }
 
+type fileItem struct {
+	path    string
+	diffIdx int
+}
+
 type model struct {
 	commits    []commit
 	cursor     int
 	focus      panel
 	diffLines  []diffLine
 	diffOffset int
+	fileItems  []fileItem
+	fileCursor int
+	showFiles  bool
+	searching  bool
+	query      string
+	flash      string
 	repoPath   string
 	width      int
 	height     int
@@ -196,4 +209,71 @@ func diffPanelHeight(m model) int {
 		return 5
 	}
 	return h
+}
+
+// parseFileItems scans diffLines for "diff --git" boundaries and returns each
+// file's path and the index of its boundary line in diffLines.
+func parseFileItems(lines []diffLine) []fileItem {
+	var items []fileItem
+	for i, line := range lines {
+		if line.kind != lineMeta || !strings.HasPrefix(line.text, "diff --git ") {
+			continue
+		}
+		parts := strings.Fields(line.text)
+		if len(parts) < 4 {
+			continue
+		}
+		path := strings.TrimPrefix(parts[3], "b/")
+		items = append(items, fileItem{path: path, diffIdx: i})
+	}
+	return items
+}
+
+// filterCommits returns commits whose subject, author, or short hash contain
+// query (case-insensitive). An empty query returns all commits unchanged.
+func filterCommits(commits []commit, query string) []commit {
+	if query == "" {
+		return commits
+	}
+	q := strings.ToLower(query)
+	var out []commit
+	for _, c := range commits {
+		if strings.Contains(strings.ToLower(c.subject), q) ||
+			strings.Contains(strings.ToLower(c.author), q) ||
+			strings.Contains(strings.ToLower(c.shortHash), q) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// visibleCommits returns the commit list after applying the current search query.
+func visibleCommits(m model) []commit {
+	return filterCommits(m.commits, m.query)
+}
+
+// scrollToDiffLine sets diffOffset so that lineIdx is visible, clamped to valid range.
+func scrollToDiffLine(m model, lineIdx int) model {
+	m.diffOffset = lineIdx
+	maxOff := len(m.diffLines) - diffPanelHeight(m)
+	if maxOff < 0 {
+		maxOff = 0
+	}
+	if m.diffOffset > maxOff {
+		m.diffOffset = maxOff
+	}
+	if m.diffOffset < 0 {
+		m.diffOffset = 0
+	}
+	return m
+}
+
+// toggleFileView shows or hides the file list in the left panel.
+// Hiding resets fileCursor.
+func toggleFileView(m model) model {
+	m.showFiles = !m.showFiles
+	if !m.showFiles {
+		m.fileCursor = 0
+	}
+	return m
 }
