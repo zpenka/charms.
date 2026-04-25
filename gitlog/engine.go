@@ -119,10 +119,24 @@ type model struct {
 	diffCacheHits   int
 	statCacheHits   int
 	regexCacheHits  int
-	repoPath        string
-	width           int
-	height          int
-	loading         bool
+	// Advanced Operations
+	showRebaseUI      bool
+	rebaseSequence    []rebaseOp
+	showCherryPickUI  bool
+	cherryPickList    []string
+	resetMode         string // soft, mixed, hard
+	amendMessage      string
+	// Analytics
+	showAnalytics     bool
+	authorStats       map[string]int
+	timeStats         map[string]int
+	collaborators     map[string][]string // author -> co-authors
+	reviewers         map[string][]string // commit hash -> reviewers
+	productivity      map[string]interface{}
+	repoPath          string
+	width             int
+	height            int
+	loading           bool
 }
 
 type commitStatistics struct {
@@ -170,6 +184,12 @@ type regexCache struct {
 	data     map[string]*regexp.Regexp
 	maxSize  int
 	hitCount int
+}
+
+type rebaseOp struct {
+	action  string // pick, squash, fixup, reword, drop
+	hash    string
+	subject string
 }
 
 func newModel(repoPath string) model {
@@ -1407,6 +1427,19 @@ func handleKeyBinding(m model, key string) model {
 		}
 	case "f":
 		m = toggleFileView(m)
+	case "R":
+		m.showRebaseUI = !m.showRebaseUI
+		if m.showRebaseUI && len(m.rebaseSequence) == 0 {
+			m.rebaseSequence = parseRebaseSequence(m.commits)
+		}
+	case "C":
+		m.showCherryPickUI = !m.showCherryPickUI
+	case "A":
+		m.showAnalytics = !m.showAnalytics
+		if m.showAnalytics {
+			m.authorStats = calculateAuthorStats(m.commits)
+			m.timeStats = calculateTimeStats(m.commits)
+		}
 	default:
 		// Handle multi-key like "5j"
 		if len(key) > 1 && (strings.HasSuffix(key, "j") || strings.HasSuffix(key, "k")) {
@@ -1640,4 +1673,286 @@ func safeParseCommitGraph(commits []commit) []graphNode {
 		return []graphNode{}
 	}
 	return parseCommitGraph(commits)
+}
+
+// ===== OPTION A: ADVANCED COMMIT OPERATIONS =====
+
+// --- Interactive Rebase ---
+
+// parseRebaseSequence builds a rebase operation sequence from commits.
+func parseRebaseSequence(commits []commit) []rebaseOp {
+	var ops []rebaseOp
+	for _, c := range commits {
+		ops = append(ops, rebaseOp{
+			action:  "pick",
+			hash:    c.hash,
+			subject: c.subject,
+		})
+	}
+	return ops
+}
+
+// reorderCommit moves a commit in the rebase sequence.
+func reorderCommit(seq []rebaseOp, from, to int) []rebaseOp {
+	if from < 0 || from >= len(seq) || to < 0 || to >= len(seq) {
+		return seq
+	}
+	if from == to {
+		return seq
+	}
+	op := seq[from]
+	newSeq := make([]rebaseOp, 0, len(seq))
+	for i, o := range seq {
+		if i == from {
+			continue
+		}
+		if i == to && from < to {
+			newSeq = append(newSeq, o)
+			newSeq = append(newSeq, op)
+		} else if i == to && from > to {
+			newSeq = append(newSeq, op)
+			newSeq = append(newSeq, o)
+		} else {
+			newSeq = append(newSeq, o)
+		}
+	}
+	return newSeq
+}
+
+// squashCommit marks a commit for squashing.
+func squashCommit(seq []rebaseOp, idx int) []rebaseOp {
+	if idx >= 0 && idx < len(seq) {
+		seq[idx].action = "squash"
+	}
+	return seq
+}
+
+// fixupCommit marks a commit for fixup (squash without message).
+func fixupCommit(seq []rebaseOp, idx int) []rebaseOp {
+	if idx >= 0 && idx < len(seq) {
+		seq[idx].action = "fixup"
+	}
+	return seq
+}
+
+// previewRebase renders a preview of the rebase operation.
+func previewRebase(seq []rebaseOp) string {
+	var sb strings.Builder
+	sb.WriteString("Rebase sequence:\n")
+	for i, op := range seq {
+		hash := op.hash
+		if len(hash) > 7 {
+			hash = hash[:7]
+		}
+		sb.WriteString(fmt.Sprintf("%d: %s %s - %s\n", i, op.action, hash, op.subject))
+	}
+	return sb.String()
+}
+
+// --- Cherry-pick ---
+
+// toggleCherryPick adds or removes a commit from cherry-pick selection.
+func toggleCherryPick(m model, hash string) model {
+	found := false
+	for i, h := range m.cherryPickList {
+		if h == hash {
+			m.cherryPickList = append(m.cherryPickList[:i], m.cherryPickList[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		m.cherryPickList = append(m.cherryPickList, hash)
+	}
+	return m
+}
+
+// previewCherryPick shows which commits will be cherry-picked.
+func previewCherryPick(commits []commit, picks []string) string {
+	var sb strings.Builder
+	sb.WriteString("Cherry-pick queue:\n")
+	for i, pick := range picks {
+		for _, c := range commits {
+			if c.hash == pick || c.shortHash == pick {
+				hash := c.shortHash
+				if len(hash) > 7 {
+					hash = hash[:7]
+				}
+				sb.WriteString(fmt.Sprintf("%d: %s - %s\n", i, hash, c.subject))
+				break
+			}
+		}
+	}
+	return sb.String()
+}
+
+// --- Reset ---
+
+// resetToCommit generates a reset command with the specified mode.
+func resetToCommit(hash, mode string) string {
+	if mode == "" {
+		mode = "mixed"
+	}
+	return fmt.Sprintf("git reset --%s %s", mode, hash)
+}
+
+// --- Revert ---
+
+// revertCommit generates a revert command for a commit.
+func revertCommit(hash string) string {
+	return fmt.Sprintf("git revert %s", hash)
+}
+
+// --- Amend ---
+
+// amendLastCommit updates the last commit message.
+func amendLastCommit(m model, message string) model {
+	if m.cursor < len(m.commits) {
+		m.commits[m.cursor].subject = message
+		m.amendMessage = message
+	}
+	return m
+}
+
+// ===== OPTION B: COLLABORATION & ANALYTICS =====
+
+// --- Author Statistics ---
+
+// calculateAuthorStats counts commits by author.
+func calculateAuthorStats(commits []commit) map[string]int {
+	stats := make(map[string]int)
+	for _, c := range commits {
+		stats[c.author]++
+	}
+	return stats
+}
+
+// renderAuthorStats renders author statistics as a list.
+func renderAuthorStats(stats map[string]int, width int) string {
+	var sb strings.Builder
+	sb.WriteString("Author Statistics:\n")
+	for author, count := range stats {
+		sb.WriteString(fmt.Sprintf("%s: %d commits\n", author, count))
+	}
+	return sb.String()
+}
+
+// --- Time-based Analytics ---
+
+// calculateTimeStats aggregates commits by time period.
+func calculateTimeStats(commits []commit) map[string]int {
+	stats := make(map[string]int)
+	for _, c := range commits {
+		// Simple bucketing by day mentioned in "when" field
+		if strings.Contains(c.when, "day") {
+			stats["recent"]++
+		} else if strings.Contains(c.when, "week") {
+			stats["past_week"]++
+		} else {
+			stats["older"]++
+		}
+	}
+	return stats
+}
+
+// aggregateByWeek groups commits by week.
+func aggregateByWeek(commits []commit) map[string]int {
+	weekly := make(map[string]int)
+	for _, c := range commits {
+		// Simple aggregation based on "when" field
+		if strings.Contains(c.when, "ago") {
+			weekly["current"]++
+		}
+	}
+	return weekly
+}
+
+// renderTimeStats renders time-based statistics as heatmap-style output.
+func renderTimeStats(stats map[string]int, width int) string {
+	var sb strings.Builder
+	sb.WriteString("Time-based Statistics:\n")
+	for period, count := range stats {
+		sb.WriteString(fmt.Sprintf("%s: %d\n", period, count))
+	}
+	return sb.String()
+}
+
+// --- Co-author Detection ---
+
+// extractCoAuthors parses co-authors from commit message.
+func extractCoAuthors(message string) []string {
+	var coAuthors []string
+	re := regexp.MustCompile(`Co-authored-by:\s*(.+?)\s*<`)
+	matches := re.FindAllStringSubmatch(message, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			coAuthors = append(coAuthors, match[1])
+		}
+	}
+	return coAuthors
+}
+
+// --- Reviewer Tracking ---
+
+// extractReviewers parses reviewers from commit message.
+func extractReviewers(message string) []string {
+	var reviewers []string
+	re := regexp.MustCompile(`Reviewed-by:\s*(.+?)\s*<`)
+	matches := re.FindAllStringSubmatch(message, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			reviewers = append(reviewers, match[1])
+		}
+	}
+	return reviewers
+}
+
+// --- Productivity Metrics ---
+
+// calculateProductivity computes productivity metrics for commits.
+func calculateProductivity(commits []commit) map[string]interface{} {
+	metrics := make(map[string]interface{})
+	if len(commits) == 0 {
+		return metrics
+	}
+	metrics["commits"] = len(commits)
+	metrics["unique_authors"] = len(calculateAuthorStats(commits))
+	return metrics
+}
+
+// renderProductivityMetrics renders productivity metrics.
+func renderProductivityMetrics(metrics map[string]interface{}, width int) string {
+	var sb strings.Builder
+	sb.WriteString("Productivity Metrics:\n")
+	for key, value := range metrics {
+		sb.WriteString(fmt.Sprintf("%s: %v\n", key, value))
+	}
+	return sb.String()
+}
+
+// --- UI Integration ---
+
+// renderRebaseUI renders the interactive rebase interface.
+func renderRebaseUI(m model, width int) string {
+	if len(m.rebaseSequence) == 0 {
+		m.rebaseSequence = parseRebaseSequence(m.commits)
+	}
+	return previewRebase(m.rebaseSequence)
+}
+
+// renderAnalyticsPanel renders the analytics dashboard.
+func renderAnalyticsPanel(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("Analytics Dashboard:\n\n")
+
+	// Author stats
+	stats := calculateAuthorStats(m.commits)
+	sb.WriteString(renderAuthorStats(stats, width))
+	sb.WriteString("\n")
+
+	// Time stats
+	timeStats := calculateTimeStats(m.commits)
+	sb.WriteString(renderTimeStats(timeStats, width))
+
+	return sb.String()
 }

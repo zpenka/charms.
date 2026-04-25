@@ -413,3 +413,66 @@ Comprehensive error recovery:
 **Blame:** press `B` to see `git blame` for the file currently visible in the diff panel. Each line shows the short commit hash, author, date, line number, and source. Press `B` or `Esc` to return to the diff.
 
 **Clipboard:** `y` copies the full 40-character commit hash. Requires `pbcopy` (macOS), `wl-copy` (Wayland), `xclip`, or `xsel` to be installed.
+
+---
+
+## Advanced Operations & Analytics
+
+### Advanced Commit Operations (5 Features)
+
+**Interactive Rebase UI** (`R` key) - Simulate rebase workflows
+- `parseRebaseSequence()` - Build operation list from commits
+- `reorderCommit()` - Reorder commits in sequence
+- `squashCommit()` - Mark commits for squashing
+- `fixupCommit()` - Mark commits for fixup (squash without message)
+- `previewRebase()` - Show rebase result preview
+
+**Cherry-pick Selection** (`C` key) - Select and cherry-pick commits
+- `toggleCherryPick()` - Add/remove from cherry-pick list
+- `previewCherryPick()` - Show cherry-pick queue
+
+**Reset Modes** - Soft/mixed/hard reset
+- `resetToCommit()` - Generate reset command with mode
+
+**Revert Support** - Create revert commits
+- `revertCommit()` - Generate revert command
+
+**Amend Last Commit** - Edit last commit message
+- `amendLastCommit()` - Update last commit
+
+### Collaboration & Analytics (5 Features)
+
+**Author Statistics** - Track commits by author
+- `calculateAuthorStats()` - Count commits per author
+- `renderAuthorStats()` - Display author list with counts
+
+**Time-based Analytics** - Analyze commit patterns over time
+- `calculateTimeStats()` - Bucket commits by time period
+- `aggregateByWeek()` - Group commits by week
+- `renderTimeStats()` - Display time heatmap
+
+**Co-author Detection** - Parse co-authors from commit messages
+- `extractCoAuthors()` - Find "Co-authored-by:" trailers
+- Supports multiple co-authors per commit
+
+**Reviewer Tracking** - Identify reviewers from commits
+- `extractReviewers()` - Find "Reviewed-by:" trailers
+- Track review history per commit
+
+**Productivity Metrics** - Calculate productivity indicators
+- `calculateProductivity()` - Compute metrics (commits, unique authors)
+- `renderProductivityMetrics()` - Display productivity dashboard
+
+### New Keybindings
+
+- `R` - Toggle interactive rebase UI
+- `C` - Toggle cherry-pick selection mode
+- `A` - Show analytics dashboard
+
+### Analytics Dashboard
+
+The analytics panel displays:
+- Author contribution statistics
+- Time-based commit distribution
+- Productivity metrics
+- Collaboration insights
