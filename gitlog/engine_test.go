@@ -343,3 +343,197 @@ func TestDiffPanelHeight_Minimum(t *testing.T) {
 		t.Error("should be at least 5")
 	}
 }
+
+// --- parseFileItems ---
+
+func TestParseFileItems_Empty(t *testing.T) {
+	items := parseFileItems([]diffLine{
+		{lineContext, "context"},
+		{lineAdded, "+added"},
+	})
+	if len(items) != 0 {
+		t.Errorf("expected 0, got %d", len(items))
+	}
+}
+
+func TestParseFileItems_Single(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "diff --git a/foo.go b/foo.go"},
+		{lineMeta, "index abc..def 100644"},
+		{lineAdded, "+hello"},
+	}
+	items := parseFileItems(lines)
+	if len(items) != 1 {
+		t.Fatalf("expected 1, got %d", len(items))
+	}
+	if items[0].path != "foo.go" {
+		t.Errorf("path: got %q", items[0].path)
+	}
+	if items[0].diffIdx != 0 {
+		t.Errorf("diffIdx: got %d", items[0].diffIdx)
+	}
+}
+
+func TestParseFileItems_Multiple(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "diff --git a/a.go b/a.go"},
+		{lineContext, "context"},
+		{lineMeta, "diff --git a/path/to/b.go b/path/to/b.go"},
+		{lineAdded, "+new"},
+	}
+	items := parseFileItems(lines)
+	if len(items) != 2 {
+		t.Fatalf("expected 2, got %d", len(items))
+	}
+	if items[0].path != "a.go" {
+		t.Errorf("first path: got %q", items[0].path)
+	}
+	if items[0].diffIdx != 0 {
+		t.Errorf("first diffIdx: got %d", items[0].diffIdx)
+	}
+	if items[1].path != "path/to/b.go" {
+		t.Errorf("second path: got %q", items[1].path)
+	}
+	if items[1].diffIdx != 2 {
+		t.Errorf("second diffIdx: got %d", items[1].diffIdx)
+	}
+}
+
+func TestParseFileItems_SkipsNonDiffGit(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "--- a/foo.go"},
+		{lineMeta, "+++ b/foo.go"},
+		{lineMeta, "diff --git a/bar.go b/bar.go"},
+	}
+	items := parseFileItems(lines)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 (only diff --git lines), got %d", len(items))
+	}
+}
+
+// --- filterCommits ---
+
+func makeNamedCommits() []commit {
+	return []commit{
+		{shortHash: "aaa1111", author: "John Doe", subject: "Fix login bug"},
+		{shortHash: "bbb2222", author: "Jane Smith", subject: "Add user model"},
+		{shortHash: "ccc3333", author: "John Doe", subject: "Update README"},
+	}
+}
+
+func TestFilterCommits_EmptyQuery(t *testing.T) {
+	commits := makeNamedCommits()
+	result := filterCommits(commits, "")
+	if len(result) != 3 {
+		t.Errorf("empty query should return all, got %d", len(result))
+	}
+}
+
+func TestFilterCommits_BySubject(t *testing.T) {
+	result := filterCommits(makeNamedCommits(), "login")
+	if len(result) != 1 || result[0].subject != "Fix login bug" {
+		t.Errorf("expected Fix login bug, got %v", result)
+	}
+}
+
+func TestFilterCommits_ByAuthor(t *testing.T) {
+	result := filterCommits(makeNamedCommits(), "Jane")
+	if len(result) != 1 || result[0].author != "Jane Smith" {
+		t.Errorf("expected Jane Smith commit, got %v", result)
+	}
+}
+
+func TestFilterCommits_ByHash(t *testing.T) {
+	result := filterCommits(makeNamedCommits(), "bbb")
+	if len(result) != 1 || result[0].shortHash != "bbb2222" {
+		t.Errorf("expected bbb2222, got %v", result)
+	}
+}
+
+func TestFilterCommits_CaseInsensitive(t *testing.T) {
+	result := filterCommits(makeNamedCommits(), "LOGIN")
+	if len(result) != 1 {
+		t.Errorf("filter should be case-insensitive, got %d", len(result))
+	}
+}
+
+func TestFilterCommits_NoMatch(t *testing.T) {
+	result := filterCommits(makeNamedCommits(), "zzznomatch")
+	if len(result) != 0 {
+		t.Errorf("expected 0 results, got %d", len(result))
+	}
+}
+
+func TestFilterCommits_MultipleMatches(t *testing.T) {
+	result := filterCommits(makeNamedCommits(), "John")
+	if len(result) != 2 {
+		t.Errorf("expected 2 John Doe commits, got %d", len(result))
+	}
+}
+
+// --- visibleCommits ---
+
+func TestVisibleCommits_NoQuery(t *testing.T) {
+	m := model{commits: makeCommits(5)}
+	if len(visibleCommits(m)) != 5 {
+		t.Error("no query should return all commits")
+	}
+}
+
+func TestVisibleCommits_WithQuery(t *testing.T) {
+	m := model{commits: makeNamedCommits(), query: "login"}
+	vc := visibleCommits(m)
+	if len(vc) != 1 || vc[0].subject != "Fix login bug" {
+		t.Errorf("unexpected result: %v", vc)
+	}
+}
+
+// --- scrollToDiffLine ---
+
+func TestScrollToDiffLine(t *testing.T) {
+	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
+	m = scrollToDiffLine(m, 10)
+	if m.diffOffset != 10 {
+		t.Errorf("expected 10, got %d", m.diffOffset)
+	}
+}
+
+func TestScrollToDiffLine_ClampsToMax(t *testing.T) {
+	// height=30 → panelH=23, max=50-23=27
+	m := model{diffLines: makeDiffLines(50), height: 30}
+	m = scrollToDiffLine(m, 1000)
+	panelH := diffPanelHeight(m)
+	expected := len(m.diffLines) - panelH
+	if m.diffOffset != expected {
+		t.Errorf("expected %d, got %d", expected, m.diffOffset)
+	}
+}
+
+func TestScrollToDiffLine_ClampsToZero(t *testing.T) {
+	m := model{diffLines: makeDiffLines(50), height: 30}
+	m = scrollToDiffLine(m, -5)
+	if m.diffOffset != 0 {
+		t.Errorf("expected 0, got %d", m.diffOffset)
+	}
+}
+
+// --- toggleFileView ---
+
+func TestToggleFileView_Show(t *testing.T) {
+	m := model{showFiles: false}
+	m = toggleFileView(m)
+	if !m.showFiles {
+		t.Error("expected showFiles=true")
+	}
+}
+
+func TestToggleFileView_Hide(t *testing.T) {
+	m := model{showFiles: true, fileCursor: 3}
+	m = toggleFileView(m)
+	if m.showFiles {
+		t.Error("expected showFiles=false")
+	}
+	if m.fileCursor != 0 {
+		t.Error("expected fileCursor reset to 0 on hide")
+	}
+}
