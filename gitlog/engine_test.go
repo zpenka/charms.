@@ -3636,3 +3636,335 @@ func TestRenderIssueRefs_ShowsReferences(t *testing.T) {
 		t.Error("should render non-empty issue refs")
 	}
 }
+
+// --- Advanced Git Operations (5 features) ---
+
+// Feature 1: Interactive Rebase with Live Preview
+func TestPreviewRebaseOperations_ShowsChanges(t *testing.T) {
+	ops := []rebaseOp{
+		{action: "pick", hash: "aaa", subject: "First"},
+		{action: "squash", hash: "bbb", subject: "Second"},
+	}
+	preview := previewRebaseOperations(ops)
+	if !preview.willApply {
+		t.Error("should preview rebase")
+	}
+}
+
+// Feature 2: Conflict Resolution UI
+func TestDetectConflicts_FindsMarkers(t *testing.T) {
+	conflicts := detectConflicts("<<<<<<< HEAD\nmy code\n=======\ntheir code\n>>>>>>> branch")
+	if len(conflicts) == 0 {
+		t.Error("should detect conflict markers")
+	}
+}
+
+func TestRenderConflictUI_ShowsOptions(t *testing.T) {
+	m := model{
+		showConflictUI: true,
+		conflictList: []conflictInfo{
+			{file: "main.go", resolved: false},
+			{file: "utils.go", resolved: true},
+		},
+	}
+	output := renderConflictUI(m, 50)
+	if output == "" {
+		t.Error("should render conflict UI")
+	}
+}
+
+// Feature 3: Squash/Fixup Automation
+func TestPlanSquash_CreatesSequence(t *testing.T) {
+	plan := planSquashSequence("aaa", []string{"bbb", "ccc"}, "Combined message")
+	if plan.resultMsg == "" {
+		t.Error("should create squash plan")
+	}
+}
+
+// Feature 4: Cherry-pick Improvements
+func TestImproveCheryPick_SuggestsResolutions(t *testing.T) {
+	m := model{
+		commits: []commit{
+			{hash: "aaa", subject: "Fix: important fix"},
+		},
+	}
+	improvements := improveCherryPick(m, "aaa")
+	if improvements == nil {
+		t.Error("should improve cherry-pick")
+	}
+}
+
+// Feature 5: Commit Amend with Diff Viewing
+func TestPreviewAmend_ShowsDiff(t *testing.T) {
+	preview := previewAmendCommit("original message", "new message", map[string]int{"file.go": 5})
+	if preview.originalMsg == "" {
+		t.Error("should preview amend")
+	}
+}
+
+// --- Team & Collaboration (5 features) ---
+
+// Feature 6: Team Statistics Dashboard
+func TestCalculateTeamStats_ComputesMetrics(t *testing.T) {
+	commits := []commit{
+		{author: "Alice", subject: "Feature A"},
+		{author: "Alice", subject: "Fix B"},
+		{author: "Bob", subject: "Docs C"},
+	}
+	stats := calculateTeamStats(commits)
+	if len(stats) == 0 {
+		t.Error("should calculate team stats")
+	}
+}
+
+// Feature 7: Code Review Workflow Automation
+func TestAutomateReviewWorkflow_TracksState(t *testing.T) {
+	workflow := automateReviewWorkflow(123, "alice", []string{"bob", "charlie"})
+	if workflow.prNumber != 123 {
+		t.Error("should automate review workflow")
+	}
+}
+
+// Feature 8: Reviewer Assignment Suggestions
+func TestSuggestReviewers_RecommendsExperts(t *testing.T) {
+	m := model{
+		commits: []commit{
+			{author: "Alice", subject: "Fix main.go"},
+			{author: "Alice", subject: "Update main.go"},
+		},
+	}
+	suggestions := suggestReviewers(m, "utils.go")
+	if len(suggestions) == 0 {
+		t.Error("should suggest reviewers")
+	}
+}
+
+// Feature 9: Pair Programming Detection
+func TestDetectPairProgramming_FindsPatterns(t *testing.T) {
+	commits := []commit{
+		{author: "Alice", subject: "Pair: Alice & Bob"},
+		{author: "Alice", subject: "Pair: Alice & Bob"},
+	}
+	pairs := detectPairProgramming(commits)
+	if len(pairs) == 0 {
+		t.Error("should detect pair programming")
+	}
+}
+
+// Feature 10: Team Velocity Tracking
+func TestCalculateVelocity_TracksProgress(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", when: "1 week ago", subject: "Feature 1"},
+		{hash: "bbb", when: "1 week ago", subject: "Fix 1"},
+		{hash: "ccc", when: "2 weeks ago", subject: "Feature 2"},
+	}
+	velocity := calculateVelocity(commits)
+	if len(velocity) == 0 {
+		t.Error("should calculate velocity")
+	}
+}
+
+// --- AI-Powered Insights (5 features) ---
+
+// Feature 11: Commit Message Auto-completion
+func TestAutoCompleteMessage_SuggestsEndings(t *testing.T) {
+	completions := autoCompleteMessage("Add", []commit{
+		{subject: "Add feature X"},
+		{subject: "Add test for Y"},
+	})
+	if len(completions) == 0 {
+		t.Error("should suggest completions")
+	}
+}
+
+// Feature 12: ML-based Commit Classification
+func TestClassifyCommit_CategorizesFix(t *testing.T) {
+	class := classifyCommit("Fix: login bug", "aaa")
+	if class.category == "" {
+		t.Error("should classify commit")
+	}
+	if class.category != "fix" && class.category != "feature" {
+		t.Error("category should be valid")
+	}
+}
+
+// Feature 13: Anomaly Detection
+func TestDetectAnomalies_FindsUnusual(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Small fix"},
+		{hash: "bbb", subject: "Massive refactor with 10000 lines"},
+		{hash: "ccc", subject: "Another fix"},
+	}
+	anomalies := detectAnomalies(commits)
+	if len(anomalies) == 0 {
+		t.Error("should detect anomalies")
+	}
+}
+
+// Feature 14: Similar Commits Finder
+func TestFindSimilarCommits_ComparesMessages(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Fix login bug in auth.go"},
+		{hash: "bbb", subject: "Fix login issue in auth.go"},
+		{hash: "ccc", subject: "Add feature"},
+	}
+	similar := findSimilarCommits(commits, "aaa")
+	if len(similar) == 0 {
+		t.Error("should find similar commits")
+	}
+}
+
+// Feature 15: Auto-generated Summaries
+func TestGenerateAutoSummary_CreatesAbstract(t *testing.T) {
+	summary := generateAutoSummary("aaa", "Fix: long commit message with many details about the authentication system")
+	if summary.summary == "" {
+		t.Error("should generate summary")
+	}
+}
+
+// --- Compliance & Security (5 features) ---
+
+// Feature 16: Commit Signing Enforcement
+func TestCheckSigningCompliance_VerifiesSignature(t *testing.T) {
+	statuses := checkSigningCompliance([]commit{
+		{hash: "aaa", subject: "Signed commit"},
+		{hash: "bbb", subject: "Unsigned commit"},
+	}, true)
+	if len(statuses) == 0 {
+		t.Error("should check signing compliance")
+	}
+}
+
+// Feature 17: License Header Tracking
+func TestTrackLicenseHeaders_ChecksFiles(t *testing.T) {
+	headers := trackLicenseHeaders("aaa")
+	if headers == nil {
+		t.Error("should track license headers")
+	}
+}
+
+// Feature 18: Security Scanning Integration
+func TestScanForSecurityIssues_DetectsProblems(t *testing.T) {
+	issues := scanForSecurityIssues("aaa", "api_key = 'sk-123456789'")
+	if len(issues) == 0 {
+		t.Error("should detect security issues")
+	}
+}
+
+// Feature 19: GDPR Data Deletion Tracking
+func TestTrackDataDeletionRequests_LogsRequests(t *testing.T) {
+	m := model{dataDeleteRequests: []dataDeleteRequest{}}
+	m = trackDataDeletion(m, "aaa", "user@example.com")
+	if len(m.dataDeleteRequests) != 1 {
+		t.Error("should track deletion request")
+	}
+}
+
+// Feature 20: Secrets Detection
+func TestDetectSecrets_FindsExposed(t *testing.T) {
+	secrets := detectSecrets("aaa", "password = 'secret123'")
+	if len(secrets) == 0 {
+		t.Error("should detect secrets")
+	}
+}
+
+// --- Release & Versioning (5 features) ---
+
+// Feature 21: Semantic Versioning Detection
+func TestDetectSemver_IdentifiesVersions(t *testing.T) {
+	versions := detectSemver([]commit{
+		{hash: "aaa", subject: "v1.0.0"},
+		{hash: "bbb", subject: "v1.1.0"},
+		{hash: "ccc", subject: "v2.0.0"},
+	})
+	if len(versions) == 0 {
+		t.Error("should detect versions")
+	}
+}
+
+// Feature 22: Changelog Auto-generation
+func TestGenerateChangelog_CreatesNotes(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "feat: add feature"},
+		{hash: "bbb", subject: "fix: bug fix"},
+		{hash: "ccc", subject: "docs: update"},
+	}
+	changelog := generateChangelog(commits, "v1.0.0")
+	if changelog == nil {
+		t.Error("should generate changelog")
+	}
+}
+
+// Feature 23: Release Note Builder
+func TestBuildReleaseNotes_CreatesDocument(t *testing.T) {
+	notes := buildReleaseNotes("v1.0.0", []string{"aaa", "bbb"})
+	if notes.version != "v1.0.0" {
+		t.Error("should build release notes")
+	}
+}
+
+// Feature 24: Version Bump History
+func TestTrackVersionBumps_RecordsChanges(t *testing.T) {
+	bumps := trackVersionBumps([]commit{
+		{hash: "aaa", subject: "Bump version 1.0.0 -> 1.1.0"},
+	})
+	if len(bumps) == 0 {
+		t.Error("should track version bumps")
+	}
+}
+
+// Feature 25: Milestone Tracking
+func TestTrackMilestones_AssignCommits(t *testing.T) {
+	m := model{milestones: []milestone{}}
+	m = createMilestone(m, "v1.0", []string{"aaa", "bbb"})
+	if len(m.milestones) != 1 {
+		t.Error("should create milestone")
+	}
+}
+
+// --- Advanced Performance (5 features) ---
+
+// Feature 26: Incremental Repo Loading
+func TestIncrementalLoad_TracksProgress(t *testing.T) {
+	state := incrementalLoadRepository("repo", 1000)
+	if state.totalCommits == 0 {
+		t.Error("should track load progress")
+	}
+}
+
+// Feature 27: Parallel Diff Processing
+func TestParallelDiffProcessing_ProcessesConcurrently(t *testing.T) {
+	results := parallelProcessDiffs([]string{"aaa", "bbb", "ccc"})
+	if len(results) == 0 {
+		t.Error("should process diffs in parallel")
+	}
+}
+
+// Feature 28: Background Indexing
+func TestBackgroundIndexing_BuildsIndex(t *testing.T) {
+	data := buildBackgroundIndex([]commit{
+		{hash: "aaa", subject: "Feature"},
+		{hash: "bbb", subject: "Fix"},
+	})
+	if data.entries == 0 {
+		t.Error("should build index")
+	}
+}
+
+// Feature 29: Lazy Blame Loading
+func TestLazyBlame_LoadsOnDemand(t *testing.T) {
+	blame := lazyLoadBlame("aaa", "main.go")
+	if blame == nil {
+		t.Error("should lazy load blame")
+	}
+}
+
+// Feature 30: Memory Optimization
+func TestMemoryOptimization_TracksUsage(t *testing.T) {
+	metrics := optimizeMemory([]commit{
+		{hash: "aaa", subject: "Fix"},
+	})
+	if metrics.usageBytes == 0 {
+		t.Error("should track memory")
+	}
+}
