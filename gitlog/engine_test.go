@@ -773,3 +773,99 @@ func TestToggleBranchView_Hide(t *testing.T) {
 		t.Error("expected branchCursor reset to 0")
 	}
 }
+
+// --- filterCommitsByAuthor ---
+
+func TestFilterCommitsByAuthor_Empty(t *testing.T) {
+	commits := makeNamedCommits()
+	result := filterCommitsByAuthor(commits, "")
+	if len(result) != 3 {
+		t.Errorf("empty filter should return all, got %d", len(result))
+	}
+}
+
+func TestFilterCommitsByAuthor_SingleMatch(t *testing.T) {
+	commits := makeNamedCommits()
+	result := filterCommitsByAuthor(commits, "Jane Smith")
+	if len(result) != 1 || result[0].author != "Jane Smith" {
+		t.Errorf("expected Jane Smith, got %v", result)
+	}
+}
+
+func TestFilterCommitsByAuthor_MultipleMatches(t *testing.T) {
+	commits := makeNamedCommits()
+	result := filterCommitsByAuthor(commits, "John Doe")
+	if len(result) != 2 {
+		t.Errorf("expected 2 John Doe commits, got %d", len(result))
+	}
+}
+
+func TestFilterCommitsByAuthor_CaseInsensitive(t *testing.T) {
+	commits := makeNamedCommits()
+	result := filterCommitsByAuthor(commits, "jane smith")
+	if len(result) != 1 {
+		t.Errorf("expected 1 match (case-insensitive), got %d", len(result))
+	}
+}
+
+func TestFilterCommitsByAuthor_NoMatch(t *testing.T) {
+	commits := makeNamedCommits()
+	result := filterCommitsByAuthor(commits, "Unknown Author")
+	if len(result) != 0 {
+		t.Errorf("expected 0 matches, got %d", len(result))
+	}
+}
+
+// --- filterCommitsSince ---
+
+func makeCommitsWithDays() []commit {
+	return []commit{
+		{shortHash: "aaa1111", author: "John", when: "1 day ago", subject: "Recent"},
+		{shortHash: "bbb2222", author: "Jane", when: "5 days ago", subject: "Medium"},
+		{shortHash: "ccc3333", author: "Bob", when: "20 days ago", subject: "Old"},
+		{shortHash: "ddd4444", author: "Alice", when: "100 days ago", subject: "Very old"},
+	}
+}
+
+func TestFilterCommitsSince_Zero(t *testing.T) {
+	commits := makeCommitsWithDays()
+	result := filterCommitsSince(commits, 0)
+	if len(result) != 4 {
+		t.Errorf("zero days should return all, got %d", len(result))
+	}
+}
+
+func TestFilterCommitsSince_OneDay(t *testing.T) {
+	commits := makeCommitsWithDays()
+	result := filterCommitsSince(commits, 1)
+	if len(result) != 1 {
+		t.Errorf("expected 1 commit in last 1 day, got %d", len(result))
+	}
+	if result[0].shortHash != "aaa1111" {
+		t.Errorf("expected aaa1111, got %s", result[0].shortHash)
+	}
+}
+
+func TestFilterCommitsSince_FiveDays(t *testing.T) {
+	commits := makeCommitsWithDays()
+	result := filterCommitsSince(commits, 5)
+	if len(result) != 2 {
+		t.Errorf("expected 2 commits in last 5 days, got %d", len(result))
+	}
+}
+
+func TestFilterCommitsSince_ThirtyDays(t *testing.T) {
+	commits := makeCommitsWithDays()
+	result := filterCommitsSince(commits, 30)
+	if len(result) != 3 {
+		t.Errorf("expected 3 commits in last 30 days, got %d", len(result))
+	}
+}
+
+func TestFilterCommitsSince_NegativeDays(t *testing.T) {
+	commits := makeCommitsWithDays()
+	result := filterCommitsSince(commits, -1)
+	if len(result) != 4 {
+		t.Errorf("negative days should return all, got %d", len(result))
+	}
+}
