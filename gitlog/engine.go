@@ -76,10 +76,23 @@ type model struct {
 	// Filtering
 	authorFilter string
 	sinceFilter  int // days; 0 = no filter
-	repoPath     string
-	width        int
-	height       int
-	loading      bool
+	// Breadcrumb trail
+	navHistory    []int
+	navHistoryIdx int
+	// Bookmarks
+	bookmarks []string // commit short hashes
+	// Stats
+	lastStats commitStatistics
+	repoPath  string
+	width     int
+	height    int
+	loading   bool
+}
+
+type commitStatistics struct {
+	filesChanged int
+	insertions   int
+	deletions    int
 }
 
 func newModel(repoPath string) model {
@@ -499,4 +512,253 @@ func isWithinDays(when string, days int) bool {
 	}
 
 	return totalDays <= days
+}
+
+// formatActiveFilters returns a string showing all active filters.
+func formatActiveFilters(m model) string {
+	var filters []string
+	if m.authorFilter != "" {
+		filters = append(filters, m.authorFilter)
+	}
+	if m.sinceFilter > 0 {
+		filters = append(filters, strconv.Itoa(m.sinceFilter)+"d")
+	}
+	if len(filters) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(filters, " + ") + "]"
+}
+
+// addToNavHistory adds the current cursor position to navigation history.
+func addToNavHistory(m model, position int) model {
+	// Discard any future history if we're not at the end
+	if m.navHistoryIdx < len(m.navHistory)-1 {
+		m.navHistory = m.navHistory[:m.navHistoryIdx+1]
+	}
+	m.navHistory = append(m.navHistory, position)
+	m.navHistoryIdx = len(m.navHistory) - 1
+	return m
+}
+
+// goBackInHistory moves to the previous position in navigation history.
+func goBackInHistory(m model) model {
+	if m.navHistoryIdx > 0 {
+		m.navHistoryIdx--
+		m.cursor = m.navHistory[m.navHistoryIdx]
+	}
+	return m
+}
+
+// goForwardInHistory moves to the next position in navigation history.
+func goForwardInHistory(m model) model {
+	if m.navHistoryIdx < len(m.navHistory)-1 {
+		m.navHistoryIdx++
+		m.cursor = m.navHistory[m.navHistoryIdx]
+	}
+	return m
+}
+
+// commitStats calculates statistics for a commit's diff.
+func commitStats(lines []diffLine) commitStatistics {
+	var stats commitStatistics
+	for _, line := range lines {
+		if line.kind == lineMeta && strings.HasPrefix(line.text, "diff --git") {
+			stats.filesChanged++
+		}
+		if line.kind == lineAdded {
+			stats.insertions++
+		}
+		if line.kind == lineRemoved {
+			stats.deletions++
+		}
+	}
+	return stats
+}
+
+// generateCommitMessage generates a suggested commit message based on the diff.
+func generateCommitMessage(lines []diffLine, filename string) string {
+	stats := commitStats(lines)
+	isNew := false
+	isDeleted := false
+	isBreaking := false
+
+	for _, line := range lines {
+		if strings.Contains(line.text, "new file mode") {
+			isNew = true
+		}
+		if strings.Contains(line.text, "deleted file mode") {
+			isDeleted = true
+		}
+		// Simple breaking change detection: removed function/interface definitions
+		if line.kind == lineRemoved &&
+			(strings.Contains(line.text, "func ") || strings.Contains(line.text, "interface")) {
+			isBreaking = true
+		}
+	}
+
+	scope := filenameToScope(filename)
+	var verb string
+
+	switch {
+	case isDeleted:
+		verb = "remove"
+	case isNew:
+		verb = "add"
+	case stats.deletions > stats.insertions*2:
+		verb = "refactor"
+	default:
+		verb = "update"
+	}
+
+	msg := verb
+	if scope != "" {
+		msg += "(" + scope + ")"
+	}
+	if isBreaking {
+		msg += "!"
+	}
+	msg += ": " + capitalizeFirst(verb) + " changes"
+
+	return msg
+}
+
+// filenameToScope extracts a scope from a filename (e.g., "auth.go" -> "auth").
+func filenameToScope(filename string) string {
+	if filename == "" {
+		return ""
+	}
+	base := filename
+	if idx := strings.LastIndex(base, "/"); idx >= 0 {
+		base = base[idx+1:]
+	}
+	if idx := strings.LastIndex(base, "."); idx > 0 {
+		base = base[:idx]
+	}
+	return strings.ToLower(base)
+}
+
+// capitalizeFirst capitalizes the first letter of a string.
+func capitalizeFirst(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// toggleBookmark toggles a bookmark on the current commit.
+func toggleBookmark(m model) model {
+	if m.cursor >= len(m.commits) {
+		return m
+	}
+	hash := m.commits[m.cursor].shortHash
+	if isBookmarked(m, m.cursor) {
+		// Remove bookmark
+		var newBookmarks []string
+		for _, b := range m.bookmarks {
+			if b != hash {
+				newBookmarks = append(newBookmarks, b)
+			}
+		}
+		m.bookmarks = newBookmarks
+	} else {
+		// Add bookmark
+		m.bookmarks = append(m.bookmarks, hash)
+	}
+	return m
+}
+
+// isBookmarked checks if a commit at the given index is bookmarked.
+func isBookmarked(m model, idx int) bool {
+	if idx >= len(m.commits) {
+		return false
+	}
+	hash := m.commits[idx].shortHash
+	for _, b := range m.bookmarks {
+		if b == hash {
+			return true
+		}
+	}
+	return false
+}
+
+// jumpToNextBookmark moves the cursor to the next bookmarked commit.
+func jumpToNextBookmark(m model) model {
+	for i := m.cursor + 1; i < len(m.commits); i++ {
+		if isBookmarked(m, i) {
+			m.cursor = i
+			return m
+		}
+	}
+	return m
+}
+
+// jumpToPrevBookmark moves the cursor to the previous bookmarked commit.
+func jumpToPrevBookmark(m model) model {
+	for i := m.cursor - 1; i >= 0; i-- {
+		if isBookmarked(m, i) {
+			m.cursor = i
+			return m
+		}
+	}
+	return m
+}
+
+// detectLanguage detects the programming language from a filename.
+func detectLanguage(filename string) string {
+	ext := filename
+	if idx := strings.LastIndex(filename, "."); idx >= 0 {
+		ext = filename[idx:]
+	}
+
+	langMap := map[string]string{
+		".go":         "go",
+		".py":         "python",
+		".js":         "javascript",
+		".ts":         "typescript",
+		".rb":         "ruby",
+		".java":       "java",
+		".cpp":        "cpp",
+		".c":          "c",
+		".rs":         "rust",
+		".sh":         "bash",
+		".sql":        "sql",
+		".html":       "html",
+		".css":        "css",
+		".json":       "json",
+		".yaml":       "yaml",
+		".yml":        "yaml",
+		".xml":        "xml",
+		".md":         "markdown",
+		"Makefile":    "makefile",
+		"Dockerfile":  "dockerfile",
+		".gitignore":  "gitignore",
+		".env":        "dotenv",
+	}
+
+	if lang, ok := langMap[ext]; ok {
+		return lang
+	}
+	if lang, ok := langMap[filename]; ok {
+		return lang
+	}
+
+	// Default to text
+	return "text"
+}
+
+// miniMapPosition calculates the position of a scroll indicator (0-height).
+func miniMapPosition(cursor, panelHeight, totalCommits int) int {
+	if totalCommits <= 1 {
+		return 0
+	}
+	if panelHeight <= 1 {
+		return 0
+	}
+
+	// Map cursor position to panel height
+	position := (cursor * (panelHeight - 1)) / (totalCommits - 1)
+	if position > panelHeight-1 {
+		position = panelHeight - 1
+	}
+	return position
 }

@@ -267,7 +267,19 @@ The diff panel shows `git show --stat --patch` output for the selected commit, c
 
 **Search:** press `/` to enter search mode. Typing filters the commit list live by subject, author name, or short hash. `Esc` clears the filter; `Enter` keeps it and returns to normal navigation. The header shows `[/query] N` with the match count while a filter is active.
 
-**Filtering:** The commit list supports persistent author and time-based filtering via the model's `authorFilter` and `sinceFilter` fields. These filters stack with the search query to narrow results. For example, you can filter to commits from "Jane Smith" in the last 7 days, then further search within those results.
+**Filtering:** The commit list supports persistent author and time-based filtering via the model's `authorFilter` and `sinceFilter` fields. These filters stack with the search query to narrow results. For example, you can filter to commits from "Jane Smith" in the last 7 days, then further search within those results. Active filters are shown in the header (e.g., `[Jane Smith + 7d]`).
+
+**Navigation history:** Breadcrumb trail tracks your navigation through commits. Use model methods to jump back and forward through your browsing history.
+
+**Statistics panel:** When viewing a commit, the diff stats show files changed, insertions, and deletions. The model calculates these metrics from each commit's diff.
+
+**Commit message generator:** The model can suggest a conventional commit message based on the diff (e.g., detecting new files, deleted files, breaking changes). Use this as a template for writing commit messages.
+
+**Bookmarks:** Mark important commits for quick reference (e.g., `m` to mark, `'` to jump). Multiple bookmarks are supported and persist during a session.
+
+**Language detection:** The system detects file types from filenames (e.g., `.go` → Go, `Makefile` → Makefile) to support syntax highlighting in future updates.
+
+**Mini-map:** A position indicator calculates your location within the commit list (0–panelHeight range), useful for rendering scrollbar indicators.
 
 **File list:** press `f` to replace the commit list with the list of files changed in the current commit. Navigate with `j`/`k` and press `Enter` to jump directly to that file's section in the diff. Press `f` or `Esc` to return to the commit list.
 

@@ -869,3 +869,281 @@ func TestFilterCommitsSince_NegativeDays(t *testing.T) {
 		t.Errorf("negative days should return all, got %d", len(result))
 	}
 }
+
+// --- formatActiveFilters ---
+
+func TestFormatActiveFilters_NoFilters(t *testing.T) {
+	m := model{}
+	result := formatActiveFilters(m)
+	if result != "" {
+		t.Errorf("no filters should return empty, got %q", result)
+	}
+}
+
+func TestFormatActiveFilters_AuthorOnly(t *testing.T) {
+	m := model{authorFilter: "Jane Smith"}
+	result := formatActiveFilters(m)
+	if !strings.Contains(result, "Jane Smith") {
+		t.Errorf("should contain author, got %q", result)
+	}
+}
+
+func TestFormatActiveFilters_TimeOnly(t *testing.T) {
+	m := model{sinceFilter: 7}
+	result := formatActiveFilters(m)
+	if !strings.Contains(result, "7") {
+		t.Errorf("should contain days, got %q", result)
+	}
+}
+
+func TestFormatActiveFilters_BothFilters(t *testing.T) {
+	m := model{authorFilter: "John", sinceFilter: 14}
+	result := formatActiveFilters(m)
+	if !strings.Contains(result, "John") || !strings.Contains(result, "14") {
+		t.Errorf("should contain both filters, got %q", result)
+	}
+}
+
+// --- Navigation history (breadcrumb trail) ---
+
+func TestNavigationHistory_InitEmpty(t *testing.T) {
+	m := model{}
+	if len(m.navHistory) != 0 {
+		t.Errorf("should start empty, got %d items", len(m.navHistory))
+	}
+}
+
+func TestNavigationHistory_AddPosition(t *testing.T) {
+	m := model{}
+	m = addToNavHistory(m, 5)
+	if len(m.navHistory) != 1 {
+		t.Errorf("expected 1 item, got %d", len(m.navHistory))
+	}
+	if m.navHistory[0] != 5 {
+		t.Errorf("expected 5, got %d", m.navHistory[0])
+	}
+}
+
+func TestNavigationHistory_GoBack(t *testing.T) {
+	m := model{navHistory: []int{0, 5, 10}, navHistoryIdx: 2, cursor: 10}
+	m = goBackInHistory(m)
+	if m.navHistoryIdx != 1 {
+		t.Errorf("expected idx=1, got %d", m.navHistoryIdx)
+	}
+	if m.cursor != 5 {
+		t.Errorf("expected cursor=5, got %d", m.cursor)
+	}
+}
+
+func TestNavigationHistory_GoForward(t *testing.T) {
+	m := model{navHistory: []int{0, 5, 10}, navHistoryIdx: 1, cursor: 5}
+	m = goForwardInHistory(m)
+	if m.navHistoryIdx != 2 {
+		t.Errorf("expected idx=2, got %d", m.navHistoryIdx)
+	}
+	if m.cursor != 10 {
+		t.Errorf("expected cursor=10, got %d", m.cursor)
+	}
+}
+
+func TestNavigationHistory_CannotGoBackAtStart(t *testing.T) {
+	m := model{navHistory: []int{0, 5}, navHistoryIdx: 0}
+	m = goBackInHistory(m)
+	if m.navHistoryIdx != 0 {
+		t.Errorf("should stay at 0, got %d", m.navHistoryIdx)
+	}
+}
+
+func TestNavigationHistory_CannotGoForwardAtEnd(t *testing.T) {
+	m := model{navHistory: []int{0, 5}, navHistoryIdx: 1}
+	m = goForwardInHistory(m)
+	if m.navHistoryIdx != 1 {
+		t.Errorf("should stay at 1, got %d", m.navHistoryIdx)
+	}
+}
+
+// --- commitStats ---
+
+func TestCommitStats_Empty(t *testing.T) {
+	stats := commitStats([]diffLine{})
+	if stats.filesChanged != 0 {
+		t.Errorf("empty diff should have 0 files, got %d", stats.filesChanged)
+	}
+	if stats.insertions != 0 || stats.deletions != 0 {
+		t.Errorf("empty diff should have 0 changes")
+	}
+}
+
+func TestCommitStats_CountsFiles(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "diff --git a/foo.go b/foo.go"},
+		{lineAdded, "+line"},
+		{lineMeta, "diff --git a/bar.go b/bar.go"},
+		{lineRemoved, "-line"},
+	}
+	stats := commitStats(lines)
+	if stats.filesChanged != 2 {
+		t.Errorf("expected 2 files, got %d", stats.filesChanged)
+	}
+}
+
+func TestCommitStats_CountsInsertionsAndDeletions(t *testing.T) {
+	lines := []diffLine{
+		{lineAdded, "+added1"},
+		{lineAdded, "+added2"},
+		{lineRemoved, "-deleted1"},
+		{lineRemoved, "-deleted2"},
+		{lineRemoved, "-deleted3"},
+		{lineContext, " context"},
+	}
+	stats := commitStats(lines)
+	if stats.insertions != 2 {
+		t.Errorf("expected 2 insertions, got %d", stats.insertions)
+	}
+	if stats.deletions != 3 {
+		t.Errorf("expected 3 deletions, got %d", stats.deletions)
+	}
+}
+
+// --- generateCommitMessage ---
+
+func TestGenerateCommitMessage_Empty(t *testing.T) {
+	msg := generateCommitMessage([]diffLine{}, "")
+	if msg == "" {
+		t.Error("should generate non-empty message")
+	}
+}
+
+func TestGenerateCommitMessage_DetectsDeletedFile(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "deleted file mode 100644"},
+		{lineMeta, "diff --git a/old.txt b/old.txt"},
+	}
+	msg := generateCommitMessage(lines, "old.txt")
+	if !strings.Contains(strings.ToLower(msg), "remove") && !strings.Contains(strings.ToLower(msg), "delete") {
+		t.Errorf("should suggest 'remove' or 'delete', got %q", msg)
+	}
+}
+
+func TestGenerateCommitMessage_DetectsNewFile(t *testing.T) {
+	lines := []diffLine{
+		{lineMeta, "new file mode 100644"},
+		{lineMeta, "diff --git a/new.txt b/new.txt"},
+	}
+	msg := generateCommitMessage(lines, "new.txt")
+	if !strings.Contains(strings.ToLower(msg), "add") && !strings.Contains(strings.ToLower(msg), "create") {
+		t.Errorf("should suggest 'add' or 'create', got %q", msg)
+	}
+}
+
+func TestGenerateCommitMessage_DetectsBreakingChange(t *testing.T) {
+	lines := []diffLine{
+		{lineRemoved, "-func OldAPI() {}"},
+		{lineMeta, "diff --git a/api.go b/api.go"},
+	}
+	msg := generateCommitMessage(lines, "api.go")
+	if !strings.Contains(msg, "!") {
+		t.Errorf("should contain breaking change marker (!), got %q", msg)
+	}
+}
+
+// --- bookmarks ---
+
+func TestBookmarks_InitEmpty(t *testing.T) {
+	m := model{}
+	if len(m.bookmarks) != 0 {
+		t.Errorf("should start with no bookmarks, got %d", len(m.bookmarks))
+	}
+}
+
+func TestBookmarks_Toggle(t *testing.T) {
+	m := model{cursor: 5, commits: makeCommits(10)}
+	m = toggleBookmark(m)
+	if !isBookmarked(m, 5) {
+		t.Error("cursor position should be bookmarked")
+	}
+}
+
+func TestBookmarks_ToggleRemoves(t *testing.T) {
+	c := commit{shortHash: "abc123"}
+	m := model{cursor: 0, commits: []commit{c}, bookmarks: []string{"abc123"}}
+	m = toggleBookmark(m)
+	if isBookmarked(m, 0) {
+		t.Error("bookmark should be removed")
+	}
+}
+
+func TestBookmarks_JumpToNext(t *testing.T) {
+	commits := []commit{
+		{shortHash: "aaa", subject: "first"},
+		{shortHash: "bbb", subject: "second"},
+		{shortHash: "ccc", subject: "third"},
+	}
+	m := model{commits: commits, cursor: 0, bookmarks: []string{"bbb", "ccc"}}
+	m = jumpToNextBookmark(m)
+	if m.cursor != 1 {
+		t.Errorf("expected cursor=1, got %d", m.cursor)
+	}
+}
+
+func TestBookmarks_JumpToPrev(t *testing.T) {
+	commits := []commit{
+		{shortHash: "aaa", subject: "first"},
+		{shortHash: "bbb", subject: "second"},
+		{shortHash: "ccc", subject: "third"},
+	}
+	m := model{commits: commits, cursor: 2, bookmarks: []string{"aaa", "bbb"}}
+	m = jumpToPrevBookmark(m)
+	if m.cursor != 1 {
+		t.Errorf("expected cursor=1, got %d", m.cursor)
+	}
+}
+
+// --- detectLanguage ---
+
+func TestDetectLanguage_Go(t *testing.T) {
+	if lang := detectLanguage("main.go"); lang != "go" {
+		t.Errorf("expected 'go', got %q", lang)
+	}
+}
+
+func TestDetectLanguage_Python(t *testing.T) {
+	if lang := detectLanguage("script.py"); lang != "python" {
+		t.Errorf("expected 'python', got %q", lang)
+	}
+}
+
+func TestDetectLanguage_Unknown(t *testing.T) {
+	if lang := detectLanguage("file.unknown"); lang == "" {
+		t.Error("should return some language for unknown")
+	}
+}
+
+func TestDetectLanguage_NoExtension(t *testing.T) {
+	if lang := detectLanguage("Makefile"); lang != "makefile" {
+		t.Errorf("expected 'makefile', got %q", lang)
+	}
+}
+
+// --- miniMapPosition ---
+
+func TestMiniMapPosition_StartOfList(t *testing.T) {
+	pos := miniMapPosition(0, 10, 20)
+	if pos != 0 {
+		t.Errorf("at start, should return 0, got %d", pos)
+	}
+}
+
+func TestMiniMapPosition_EndOfList(t *testing.T) {
+	pos := miniMapPosition(19, 10, 20)
+	if pos < 9 {
+		t.Errorf("near end, should return high value, got %d", pos)
+	}
+}
+
+func TestMiniMapPosition_Middle(t *testing.T) {
+	pos := miniMapPosition(5, 10, 10)
+	if pos < 4 || pos > 6 {
+		t.Errorf("in middle, should return ~5, got %d", pos)
+	}
+}
