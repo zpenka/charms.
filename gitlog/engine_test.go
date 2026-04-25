@@ -2566,3 +2566,396 @@ func TestRenderAnalyticsPanel_ShowsStats(t *testing.T) {
 		t.Error("should render non-empty analytics")
 	}
 }
+
+// --- Bisect & Recovery (5 features) ---
+
+// Feature 1: Interactive Bisect Workflow
+func TestInitiateBisect_CreatesState(t *testing.T) {
+	m := model{
+		commits: []commit{
+			{hash: "aaa", shortHash: "aaa1111"},
+			{hash: "bbb", shortHash: "bbb2222"},
+			{hash: "ccc", shortHash: "ccc3333"},
+		},
+		cursor: 1,
+	}
+	m = initiateBisect(m)
+	if !m.bisectState.active {
+		t.Error("bisect should be active")
+	}
+	if m.bisectState.current == "" {
+		t.Error("should have current commit")
+	}
+}
+
+func TestBisectMarkGood_AddsToGoodList(t *testing.T) {
+	m := model{
+		bisectState: bisectState{
+			active:  true,
+			current: "bbb",
+			good:    []string{},
+			bad:     []string{},
+		},
+	}
+	m = bisectMarkGood(m)
+	if len(m.bisectState.good) != 1 {
+		t.Errorf("expected 1 good commit, got %d", len(m.bisectState.good))
+	}
+}
+
+func TestBisectMarkBad_AddsToBadList(t *testing.T) {
+	m := model{
+		bisectState: bisectState{
+			active:  true,
+			current: "aaa",
+			good:    []string{},
+			bad:     []string{},
+		},
+	}
+	m = bisectMarkBad(m)
+	if len(m.bisectState.bad) != 1 {
+		t.Errorf("expected 1 bad commit, got %d", len(m.bisectState.bad))
+	}
+}
+
+func TestBisectFindCulprit_IdentifiesCommit(t *testing.T) {
+	commits := []commit{
+		{hash: "a1a", shortHash: "a1a1"},
+		{hash: "b2b", shortHash: "b2b2"},
+		{hash: "c3c", shortHash: "c3c3"},
+		{hash: "d4d", shortHash: "d4d4"},
+		{hash: "e5e", shortHash: "e5e5"},
+	}
+	culprit := bisectFindCulprit(commits, []string{"a1a"}, []string{"e5e"})
+	if culprit == "" {
+		t.Error("should find culprit commit")
+	}
+}
+
+// Feature 2: Bisect Visualization
+func TestRenderBisectUI_ShowsProgress(t *testing.T) {
+	m := model{
+		showBisectUI: true,
+		bisectState: bisectState{
+			active:      true,
+			current:     "bbb",
+			good:        []string{"aaa"},
+			bad:         []string{"eee"},
+			visualSteps: 2,
+			totalSteps:  5,
+		},
+	}
+	output := renderBisectUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty bisect UI")
+	}
+	if !strings.Contains(output, "aaa") && !strings.Contains(output, "eee") {
+		t.Error("should show good and bad commits")
+	}
+}
+
+func TestCalculateBisectProgress_ComputesSteps(t *testing.T) {
+	state := bisectState{
+		good:    []string{"a", "b"},
+		bad:     []string{"e", "f"},
+		current: "c",
+	}
+	steps := calculateBisectProgress(state)
+	if steps == 0 {
+		t.Error("should calculate non-zero steps")
+	}
+}
+
+// Feature 3: Reflog Recovery
+func TestExtractReflogEntries_ParsesReflog(t *testing.T) {
+	reflogOutput := "abc1234 HEAD@{0}: commit: feat: add feature\n" +
+		"def5678 HEAD@{1}: rebase: my branch\n" +
+		"ghi9012 HEAD@{2}: reset: back to main\n"
+	entries := extractReflogEntries(reflogOutput)
+	if len(entries) != 3 {
+		t.Errorf("expected 3 reflog entries, got %d", len(entries))
+	}
+	if entries[0].hash != "abc1234" {
+		t.Errorf("first hash: got %q", entries[0].hash)
+	}
+	if entries[0].action != "commit" {
+		t.Errorf("first action: got %q", entries[0].action)
+	}
+}
+
+func TestRecoverFromReflog_RestoresCommits(t *testing.T) {
+	m := model{
+		reflogEntries: []reflogEntry{
+			{hash: "abc1234", action: "rebase", message: "my branch"},
+			{hash: "def5678", action: "reset", message: "back to main"},
+		},
+	}
+	m = enableReflogRecovery(m)
+	if !m.reflogRecoveryMode {
+		t.Error("reflog recovery mode should be enabled")
+	}
+	if len(m.recoveryCommits) == 0 {
+		t.Error("should have recovery commits")
+	}
+}
+
+// Feature 4: Lost Commits Finder
+func TestFindLostCommits_ScansFsck(t *testing.T) {
+	fsckOutput := "unreachable commit abc1234\nFix: login bug\n" +
+		"unreachable commit def5678\nAdd: user model\n"
+	commits := findLostCommits(fsckOutput)
+	if len(commits) < 1 {
+		t.Error("should find at least 1 lost commit")
+	}
+}
+
+func TestRecoveryCommitsList_ShowsRecoverable(t *testing.T) {
+	m := model{
+		showLostCommits: true,
+		lostCommits: []lostCommit{
+			{hash: "abc", shortHash: "abc1234", subject: "Fix: bug"},
+			{hash: "def", shortHash: "def5678", subject: "Add: feature"},
+		},
+	}
+	output := renderLostCommitsUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty UI")
+	}
+}
+
+// Feature 5: Undo Operations
+func TestPushUndo_TracksCommit(t *testing.T) {
+	m := model{
+		undoStack:    []string{"aaa", "bbb"},
+		undoStackIdx: 2,
+	}
+	m = pushUndo(m, "ccc")
+	if m.undoStack[len(m.undoStack)-1] != "ccc" {
+		t.Error("should add commit to undo stack")
+	}
+}
+
+func TestUndo_RestoresPreviousState(t *testing.T) {
+	m := model{
+		undoStack:    []string{"aaa", "bbb", "ccc"},
+		undoStackIdx: 3,
+	}
+	m = performUndo(m)
+	if m.undoStackIdx != 2 {
+		t.Errorf("undo index: expected 2, got %d", m.undoStackIdx)
+	}
+}
+
+func TestRenderUndoMenu_ShowsStack(t *testing.T) {
+	m := model{
+		showUndoMenu: true,
+		undoStack:    []string{"aaa", "bbb", "ccc"},
+		undoStackIdx: 3,
+	}
+	output := renderUndoMenu(m, 50)
+	if output == "" {
+		t.Error("should render non-empty undo menu")
+	}
+}
+
+// --- Code Patterns & Quality (5 features) ---
+
+// Feature 6: Code Ownership Analysis
+func TestAnalyzeCodeOwnership_ComputesOwners(t *testing.T) {
+	commits := []commit{
+		{author: "Alice", subject: "Fix: main.go"},
+		{author: "Alice", subject: "Fix: main.go"},
+		{author: "Bob", subject: "Add: utils.go"},
+		{author: "Bob", subject: "Add: utils.go"},
+		{author: "Bob", subject: "Add: utils.go"},
+	}
+	ownership := analyzeCodeOwnership(commits)
+	if len(ownership) == 0 {
+		t.Error("should compute code ownership")
+	}
+	aliceData := ownership["Alice"]
+	if aliceData.author != "Alice" {
+		t.Errorf("author: got %q", aliceData.author)
+	}
+}
+
+func TestDetectCodeOwners_IdentifiesOwners(t *testing.T) {
+	ownership := map[string]codeOwnershipData{
+		"Alice": {author: "Alice", expertise: 0.85},
+		"Bob":   {author: "Bob", expertise: 0.45},
+	}
+	owner := detectCodeOwners(ownership)
+	if owner == "" {
+		t.Error("should detect code owner")
+	}
+}
+
+func TestRenderCodeOwnershipUI_ShowsAnalysis(t *testing.T) {
+	m := model{
+		showCodeOwnership: true,
+		codeOwnership: map[string]codeOwnershipData{
+			"Alice": {author: "Alice", expertise: 0.85, files: map[string]int{"main.go": 10}},
+			"Bob":   {author: "Bob", expertise: 0.45, files: map[string]int{"utils.go": 5}},
+		},
+	}
+	output := renderCodeOwnershipUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty ownership UI")
+	}
+}
+
+// Feature 7: Hotspot Detection
+func TestDetectHotspots_FindsFrequentChanges(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Fix: main.go"},
+		{hash: "bbb", subject: "Add: main.go"},
+		{hash: "ccc", subject: "Refactor: main.go"},
+		{hash: "ddd", subject: "Fix: utils.go"},
+		{hash: "eee", subject: "Add: utils.go"},
+	}
+	hotspots := detectHotspots(commits)
+	if len(hotspots) == 0 {
+		t.Error("should detect hotspots")
+	}
+	if hotspots[0].changeFrequency < 1 {
+		t.Error("should track change frequency")
+	}
+}
+
+func TestAssessRiskLevel_EvaluatesHotspots(t *testing.T) {
+	hotspot := hotspotData{
+		path:            "main.go",
+		changeFrequency: 10,
+		collaborators:   5,
+	}
+	risk := assessRiskLevel(hotspot)
+	if risk != "low" && risk != "medium" && risk != "high" {
+		t.Errorf("invalid risk level: %q", risk)
+	}
+}
+
+func TestRenderHotspotsUI_ShowsAnalysis(t *testing.T) {
+	m := model{
+		showHotspots: true,
+		hotspots: []hotspotData{
+			{path: "main.go", changeFrequency: 10, riskLevel: "high"},
+			{path: "utils.go", changeFrequency: 3, riskLevel: "low"},
+		},
+	}
+	output := renderHotspotsUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty hotspots UI")
+	}
+}
+
+// Feature 8: Commit Message Linting
+func TestLintCommitMessage_ChecksQuality(t *testing.T) {
+	result := lintCommitMessage("add feature", "abc1234")
+	if result.score > 100 || result.score < 0 {
+		t.Errorf("invalid score: %d", result.score)
+	}
+	if result.hash != "abc1234" {
+		t.Errorf("hash mismatch: got %q", result.hash)
+	}
+}
+
+func TestValidateCommitFormat_DetectsIssues(t *testing.T) {
+	issues := validateCommitFormat("fix bug")
+	if len(issues) == 0 {
+		t.Error("should detect lowercase issue")
+	}
+}
+
+func TestRenderLintingUI_ShowsResults(t *testing.T) {
+	m := model{
+		showLinting: true,
+		lintingResults: []lintingResult{
+			{hash: "abc", subject: "Add feature", score: 85, issues: []string{}},
+			{hash: "def", subject: "fix bug", score: 40, issues: []string{"lowercase"}},
+		},
+	}
+	output := renderLintingUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty linting UI")
+	}
+}
+
+// Feature 9: Large Commit Detection
+func TestDetectLargeCommits_FindsBig(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Large refactor"},
+		{hash: "bbb", subject: "Small fix"},
+		{hash: "ccc", subject: "Huge change"},
+	}
+	m := model{commits: commits}
+	m = analyzeCommitSize(m)
+	if len(m.largeCommits) == 0 {
+		t.Error("should detect at least 1 large commit")
+	}
+}
+
+func TestCalculateCommitSize_ComputesLines(t *testing.T) {
+	metrics := calculateCommitMetrics("abc1234", 500, 50)
+	if metrics.hash != "abc1234" {
+		t.Errorf("hash: got %q", metrics.hash)
+	}
+	if metrics.linesChanged != 500 {
+		t.Errorf("lines: expected 500, got %d", metrics.linesChanged)
+	}
+}
+
+func TestRenderLargeCommitsUI_ShowsLarge(t *testing.T) {
+	m := model{
+		showLargeCommits: true,
+		largeCommits: []commitMetrics{
+			{hash: "aaa", linesChanged: 500, filesChanged: 20},
+			{hash: "bbb", linesChanged: 1000, filesChanged: 50},
+		},
+	}
+	output := renderLargeCommitsUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty UI")
+	}
+}
+
+// Feature 10: Commit Complexity Analysis
+func TestAnalyzeCommitComplexity_ScoresComplexity(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa", subject: "Simple fix"},
+		{hash: "bbb", subject: "Refactor with multiple changes"},
+	}
+	m := model{
+		commits:       commits,
+		showComplexity: true,
+	}
+	m = analyzeComplexity(m)
+	if len(m.commitMetrics) == 0 {
+		t.Error("should analyze commits")
+	}
+}
+
+func TestCalculateCommitComplexity_EstimatesScore(t *testing.T) {
+	metrics := commitMetrics{
+		hash:         "abc",
+		linesChanged: 300,
+		filesChanged: 15,
+	}
+	score := calculateComplexityScore(metrics)
+	if score < 0 || score > 100 {
+		t.Errorf("invalid complexity score: %d", score)
+	}
+}
+
+func TestRenderComplexityUI_ShowsMetrics(t *testing.T) {
+	m := model{
+		showComplexity: true,
+		commitMetrics: []commitMetrics{
+			{hash: "aaa", complexity: 45, linesChanged: 200, filesChanged: 10},
+			{hash: "bbb", complexity: 78, linesChanged: 500, filesChanged: 25},
+		},
+	}
+	output := renderComplexityUI(m, 50)
+	if output == "" {
+		t.Error("should render non-empty complexity UI")
+	}
+}
