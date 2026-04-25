@@ -1,6 +1,6 @@
 # charms.
 
-A collection of [Charm](https://charm.sh) TUI games built with [Bubble Tea](https://github.com/charmbracelet/bubbletea): Chess, Tapper, Snake, and 2048.
+A collection of [Charm](https://charm.sh) TUI apps built with [Bubble Tea](https://github.com/charmbracelet/bubbletea): Chess, Tapper, Snake, 2048, and a Git Log browser.
 
 ## Install
 
@@ -183,3 +183,39 @@ Slide all tiles in one direction with each keypress. Tiles with equal values mer
 | `q` | Quit to lobby |
 
 Each merge adds to your score (e.g. merging two 512s scores 1024). **Bonus tiles** occasionally spawn on the board — merging a bonus tile doubles the points scored for that merge (the bonus marker is consumed). The HUD shows your current score, highest tile on the board, and your **all-time best score** across all sessions. After game over, scores are saved to `~/.local/share/charms/2048_scores.json` and a leaderboard shows your top 5 runs.
+
+---
+
+### Git Log
+
+A two-panel TUI for browsing the git history of the current repository — commit list on the left, coloured diff on the right.
+
+**Layout:**
+
+```
+ git log  /path/to/repo
+
+ Commits                    │ abc1234  Fix login bug
+▶ abc1234  Fix login bug …  │ diff --git a/auth.go b/auth.go
+  def5678  Add user model   │ --- a/auth.go
+  xyz9876  Update README    │ +++ b/auth.go
+  ...                       │ @@ -10,7 +10,9 @@
+                            │ -   old code
+                            │ +   new code
+```
+
+**Controls:**
+
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Move to next commit |
+| `k` / `↑` | Move to previous commit |
+| `g` / `G` | Jump to oldest / newest commit |
+| `l` / `Tab` | Switch focus to diff panel |
+| `h` / `Tab` | Switch focus back to commit list |
+| `j` / `k` *(diff focused)* | Scroll diff one line |
+| `d` / `u` *(diff focused)* | Scroll diff half a page |
+| `g` / `G` *(diff focused)* | Jump to top / bottom of diff |
+| `q` | Quit to lobby |
+
+The diff panel shows `git show --stat --patch` output for the selected commit, colour-coded: green for additions, red for removals, cyan for hunk headers, grey for file metadata. The commit list auto-scrolls to keep the cursor centred. Up to 200 commits are loaded on launch; diffs are fetched asynchronously as you navigate.
