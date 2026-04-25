@@ -267,7 +267,9 @@ The diff panel shows `git show --stat --patch` output for the selected commit, c
 
 **Search:** press `/` to enter search mode. Typing filters the commit list live by subject, author name, or short hash. `Esc` clears the filter; `Enter` keeps it and returns to normal navigation. The header shows `[/query] N` with the match count while a filter is active.
 
-**Filtering:** The commit list supports persistent author and time-based filtering via the model's `authorFilter` and `sinceFilter` fields. These filters stack with the search query to narrow results. For example, you can filter to commits from "Jane Smith" in the last 7 days, then further search within those results. Active filters are shown in the header (e.g., `[Jane Smith + 7d]`).
+**Filtering:** The commit list supports persistent author and time-based filtering via the model's `authorFilter` and `sinceFilter` fields. These filters stack with the search query to narrow results. For example, you can filter to commits from "Jane Smith" in the last 7 days, then further search within those results. Active filters are shown in the header (e.g., `[Jane Smith + 7d]`). Additional filters include regex search (`compileRegex()`) and date range filtering (`parseDateRange()`). File-specific filtering and tag-based browsing are infrastructure-ready.
+
+**Quick Jump:** Jump directly to a commit by hash using `goToCommit()`. Supports both short and full hashes with case-insensitive matching.
 
 **Navigation history:** Breadcrumb trail tracks your navigation through commits. Use model methods to jump back and forward through your browsing history.
 
@@ -280,6 +282,18 @@ The diff panel shows `git show --stat --patch` output for the selected commit, c
 **Language detection:** The system detects file types from filenames (e.g., `.go` → Go, `Makefile` → Makefile) to support syntax highlighting in future updates.
 
 **Mini-map:** A position indicator calculates your location within the commit list (0–panelHeight range), useful for rendering scrollbar indicators.
+
+**Diff Statistics & Export:** Each commit displays a stats badge showing files changed, insertions, and deletions (e.g., "3 files +10 -5"). Commits can be exported as patches via `copyAsPatch()`.
+
+**Merge Commit Support:** Special handling for merge commits (`isMergeCommit()`) with automatic parent extraction (`getMergeParents()`). Both parent diffs can be viewed separately.
+
+**Hunk Analysis:** Diff hunks are parsed and tracked (`parseHunks()`) with support for hunk-level navigation and collapsing (ready for UI integration).
+
+**Line Comments:** Annotate specific diff lines with comments (`toggleLineComment()`). Comments are stored in-memory per session for code review workflows.
+
+**Git References:** Automatically detect and extract issue/PR references from commit messages (`parseGitReferences()`). Finds `#123`, `fixes #456`, etc. for quick linking.
+
+**Tag Browsing:** Parse and display git tags (`parseTags()`). Tag view infrastructure is ready for integration with tag-based commit navigation.
 
 **File list:** press `f` to replace the commit list with the list of files changed in the current commit. Navigate with `j`/`k` and press `Enter` to jump directly to that file's section in the diff. Press `f` or `Esc` to return to the commit list.
 
