@@ -1831,3 +1831,336 @@ func TestApplyStash_FindsStash(t *testing.T) {
 		t.Errorf("wrong stash, got %q", found.name)
 	}
 }
+
+// ===== UI INTEGRATION: KEYBINDINGS & STATE =====
+
+func TestKeyBinding_M_ToggleBookmark(t *testing.T) {
+	m := model{cursor: 0, commits: []commit{{shortHash: "abc"}}, bookmarks: []string{}}
+	m = handleKeyBinding(m, "m")
+	if len(m.bookmarks) != 1 {
+		t.Errorf("m should toggle bookmark, got %d bookmarks", len(m.bookmarks))
+	}
+}
+
+func TestKeyBinding_SingleQuote_JumpBookmark(t *testing.T) {
+	m := model{cursor: 0, commits: []commit{
+		{shortHash: "aaa"},
+		{shortHash: "bbb"},
+	}, bookmarks: []string{"bbb"}}
+	m = handleKeyBinding(m, "'")
+	if m.cursor != 1 {
+		t.Errorf("' should jump to bookmark, got cursor=%d", m.cursor)
+	}
+}
+
+func TestKeyBinding_gg_GoToCommit(t *testing.T) {
+	m := model{commits: []commit{
+		{shortHash: "abc1234", hash: "abc1234567890"},
+		{shortHash: "def5678", hash: "def5678901234"},
+	}, cursor: 0}
+	m = handleKeyBinding(m, "gg")
+	// Note: gg would need additional input, so this tests the mode entry
+	if !m.inGoToCommitMode {
+		t.Error("gg should enter go-to-commit mode")
+	}
+}
+
+func TestKeyBinding_c_LineComment(t *testing.T) {
+	m := model{comments: make(map[int]string), diffOffset: 0}
+	m = handleKeyBinding(m, "c")
+	if !m.inCommentMode {
+		t.Error("c should enter comment mode")
+	}
+}
+
+func TestKeyBinding_v_SwitchToStash(t *testing.T) {
+	m := model{viewMode: "log"}
+	m = handleKeyBinding(m, "v")
+	if m.viewMode != "stash" {
+		t.Errorf("v should switch to stash, got %q", m.viewMode)
+	}
+}
+
+func TestKeyBinding_Shift_V_SwitchToReflog(t *testing.T) {
+	m := model{viewMode: "log"}
+	m = handleKeyBinding(m, "V")
+	if m.viewMode != "reflog" {
+		t.Errorf("V should switch to reflog, got %q", m.viewMode)
+	}
+}
+
+func TestKeyBinding_G_ShowGraph(t *testing.T) {
+	m := model{showGraph: false}
+	m = handleKeyBinding(m, "G")
+	if !m.showGraph {
+		t.Error("G should show graph")
+	}
+}
+
+func TestKeyBinding_F_FileView_Toggle(t *testing.T) {
+	m := model{showFiles: false}
+	m = handleKeyBinding(m, "f")
+	if !m.showFiles {
+		t.Error("f should toggle file view")
+	}
+}
+
+func TestKeyBinding_Multiple_Navigation(t *testing.T) {
+	m := model{cursor: 0, commits: makeCommits(10)}
+	m = handleKeyBinding(m, "5j")
+	if m.cursor != 5 {
+		t.Errorf("5j should move 5 down, got %d", m.cursor)
+	}
+}
+
+// ===== UI INTEGRATION: RENDERING =====
+
+func TestRenderWithStats_IncludesBadges(t *testing.T) {
+	m := model{showStatsBadge: true, lastStats: commitStatistics{filesChanged: 3, insertions: 10, deletions: 5}}
+	output := renderCommitRowWithStats(m, 0, 50)
+	if output == "" {
+		t.Error("should render non-empty output")
+	}
+}
+
+func TestRenderBookmarkList_ShowsBookmarks(t *testing.T) {
+	m := model{bookmarks: []string{"abc1234", "def5678"}, commits: []commit{
+		{shortHash: "abc1234"},
+		{shortHash: "def5678"},
+	}}
+	output := renderBookmarkList(m, 50)
+	if !strings.Contains(output, "abc1234") {
+		t.Errorf("should show bookmark, got %q", output)
+	}
+}
+
+func TestRenderGraphView_ShowsArt(t *testing.T) {
+	m := model{showGraph: true, commitGraph: []graphNode{
+		{hash: "abc1234", isMerge: false},
+	}}
+	output := renderGraphView(m, 50)
+	if output == "" {
+		t.Error("should render non-empty graph")
+	}
+}
+
+func TestRenderStashBrowser_ShowsStashes(t *testing.T) {
+	m := model{viewMode: "stash", stashes: []stashEntry{
+		{name: "stash@{0}", subject: "WIP"},
+	}}
+	output := renderViewMode(m, 50)
+	if !strings.Contains(output, "stash") {
+		t.Errorf("should show stash view, got %q", output)
+	}
+}
+
+func TestRenderReflogBrowser_ShowsReflog(t *testing.T) {
+	m := model{viewMode: "reflog", reflogEntries: []reflogEntry{
+		{hash: "abc1234", action: "commit"},
+	}}
+	output := renderViewMode(m, 50)
+	if !strings.Contains(output, "reflog") && !strings.Contains(output, "abc1234") {
+		t.Errorf("should show reflog, got %q", output)
+	}
+}
+
+func TestRenderCommentedDiff_ShowsMarkers(t *testing.T) {
+	m := model{
+		comments: map[int]string{5: "needs review"},
+		diffLines: []diffLine{
+			{lineAdded, "+test1"},
+			{lineAdded, "+test2"},
+			{lineAdded, "+test3"},
+		},
+		diffOffset: 0,
+	}
+	output := renderDiffWithComments(m, 10, 50)
+	if output == "" {
+		t.Error("should render non-empty diff")
+	}
+}
+
+// ===== OPTIMIZATION: CACHING & MEMOIZATION =====
+
+func TestDiffCache_StoresResult(t *testing.T) {
+	cache := newDiffCache(10)
+	lines := []diffLine{{lineAdded, "+test"}}
+	cache.set("abc1234", lines)
+	cached, ok := cache.get("abc1234")
+	if !ok {
+		t.Error("cache should have stored diff")
+	}
+	if len(cached) != 1 {
+		t.Errorf("cache should return same data, got %d lines", len(cached))
+	}
+}
+
+func TestDiffCache_EvictsOldest(t *testing.T) {
+	cache := newDiffCache(2)
+	cache.set("aaa", []diffLine{{lineAdded, "+a"}})
+	cache.set("bbb", []diffLine{{lineAdded, "+b"}})
+	cache.set("ccc", []diffLine{{lineAdded, "+c"}})
+	_, ok := cache.get("aaa")
+	if ok {
+		t.Error("cache should evict oldest entry")
+	}
+}
+
+func TestStatCache_Memoizes(t *testing.T) {
+	cache := newStatCache(10)
+	lines := []diffLine{
+		{lineAdded, "+test"},
+		{lineRemoved, "-old"},
+	}
+	stats1 := cache.getOrCompute("abc", lines)
+	stats2 := cache.getOrCompute("abc", lines)
+	if stats1.insertions != stats2.insertions {
+		t.Error("cached stats should be identical")
+	}
+}
+
+func TestRegexCache_Compiles(t *testing.T) {
+	cache := newRegexCache(10)
+	re, err := cache.compile("test.*pattern")
+	if err != nil {
+		t.Errorf("should compile regex, got %v", err)
+	}
+	if !re.MatchString("test something pattern") {
+		t.Error("compiled regex should match")
+	}
+}
+
+func TestRegexCache_Reuses(t *testing.T) {
+	cache := newRegexCache(10)
+	re1, _ := cache.compile("test")
+	re2, _ := cache.compile("test")
+	if re1 != re2 {
+		t.Error("cache should return same regex object")
+	}
+}
+
+// ===== OPTIMIZATION: LAZY LOADING =====
+
+func TestLazyLoadDiff_LoadsOnDemand(t *testing.T) {
+	m := model{cursor: 0, commits: makeCommits(3), diffLines: []diffLine{}}
+	m = lazyLoadDiff(m)
+	// Should trigger loading, but actual load is async
+	if !m.loading {
+		t.Error("should set loading flag")
+	}
+}
+
+func TestLazyLoadGraph_BuildsOnDemand(t *testing.T) {
+	m := model{commits: []commit{
+		{hash: "aaa", subject: "first"},
+		{hash: "bbb", subject: "second"},
+	}, commitGraph: nil}
+	m = lazyLoadGraph(m)
+	if len(m.commitGraph) != 2 {
+		t.Errorf("should build graph on demand, got %d nodes", len(m.commitGraph))
+	}
+}
+
+func TestLazyLoadStats_ComputesWhenNeeded(t *testing.T) {
+	m := model{diffLines: []diffLine{
+		{lineAdded, "+test"},
+		{lineRemoved, "-old"},
+	}}
+	stats := lazyLoadStats(m)
+	if stats.insertions != 1 {
+		t.Errorf("should compute stats, got %d insertions", stats.insertions)
+	}
+}
+
+// ===== OPTIMIZATION: ERROR HANDLING =====
+
+func TestSafeKeyBinding_InvalidKey(t *testing.T) {
+	m := model{}
+	m = safeHandleKeyBinding(m, "")
+	if m.width == 0 && m.height == 0 {
+		// Safe to call with empty key
+		return
+	}
+}
+
+func TestSafeFileModified_NoGitError(t *testing.T) {
+	result := safeIsFileModified("invalid_hash", "nonexistent.go")
+	if result {
+		t.Error("should handle missing git gracefully")
+	}
+}
+
+func TestSafeParseCommitGraph_EmptyList(t *testing.T) {
+	graph := safeParseCommitGraph(nil)
+	if graph == nil {
+		t.Error("should return empty slice, not nil")
+	}
+}
+
+// ===== OPTIMIZATION: PERFORMANCE VALIDATION =====
+
+func TestDiffParsing_CacheHitRate(t *testing.T) {
+	cache := newDiffCache(100)
+	lines := []diffLine{{lineAdded, "+test"}}
+
+	cache.set("abc", lines)
+	cache.set("def", lines)
+	cache.get("abc") // First hit
+	cache.set("abc", lines)
+	cache.get("abc") // Second hit
+
+	hits := cache.getHitCount()
+	if hits != 2 {
+		t.Errorf("expected 2 hits, got %d", hits)
+	}
+}
+
+func TestStatComputation_CacheHitRate(t *testing.T) {
+	cache := newStatCache(100)
+	lines := []diffLine{
+		{lineAdded, "+test"},
+		{lineRemoved, "-old"},
+	}
+
+	cache.getOrCompute("abc", lines)
+	cache.getOrCompute("abc", lines) // Hit
+	cache.getOrCompute("def", lines)
+	cache.getOrCompute("abc", lines) // Hit
+
+	hits := cache.getHitCount()
+	if hits != 2 {
+		t.Errorf("expected 2 hits, got %d", hits)
+	}
+}
+
+// ===== OPTIMIZATION: STATE MANAGEMENT =====
+
+func TestViewModeTransitions_Valid(t *testing.T) {
+	m := model{viewMode: "log"}
+	validModes := []string{"stash", "reflog", "log"}
+	for _, mode := range validModes {
+		m = switchViewMode(m, mode)
+		if m.viewMode != mode {
+			t.Errorf("should transition to %q", mode)
+		}
+	}
+}
+
+func TestEnterCommentMode_ValidState(t *testing.T) {
+	m := model{inCommentMode: false}
+	m = enterCommentMode(m)
+	if !m.inCommentMode {
+		t.Error("should enter comment mode")
+	}
+}
+
+func TestExitCommentMode_ClearsInput(t *testing.T) {
+	m := model{inCommentMode: true, commentInput: "test"}
+	m = exitCommentMode(m)
+	if m.inCommentMode {
+		t.Error("should exit comment mode")
+	}
+	if m.commentInput != "" {
+		t.Errorf("should clear input, got %q", m.commentInput)
+	}
+}
