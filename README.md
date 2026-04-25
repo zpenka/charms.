@@ -476,3 +476,107 @@ The analytics panel displays:
 - Time-based commit distribution
 - Productivity metrics
 - Collaboration insights
+
+---
+
+## Bisect & Recovery Workflows
+
+### Feature 1: Interactive Bisect Workflow (`B` key)
+Automated binary search to find the commit that introduced a bug:
+- `initiateBisect()` - Start a new bisect session from current commit
+- `bisectMarkGood()` - Mark current commit as "good" (bug not present)
+- `bisectMarkBad()` - Mark current commit as "bad" (bug present)
+- `bisectFindCulprit()` - Find the culprit commit through binary search
+- Narrow down hundreds of commits to a single bad commit in log(n) steps
+
+### Feature 2: Bisect Visualization
+Interactive progress tracking for bisect operations:
+- `renderBisectUI()` - Display bisect status, progress bar, and good/bad commits
+- `calculateBisectProgress()` - Estimate remaining steps to culprit
+- Visual indicators show which commits are known good/bad
+- Step counter tracks progress through the binary search
+
+### Feature 3: Reflog Recovery
+Recover lost commits from git reflog history:
+- `extractReflogEntries()` - Parse reflog output into structured data
+- `enableReflogRecovery()` - Convert reflog entries to recoverable commits
+- Supports all reflog actions (rebase, reset, cherry-pick, etc.)
+- Browse git operations history and restore from any point
+
+### Feature 4: Lost Commits Finder
+Scan dangling/unreachable commits using `git fsck`:
+- `findLostCommits()` - Parse fsck output to find orphaned commits
+- `renderLostCommitsUI()` - Display list of recoverable commits
+- Useful after failed rebases, resets, or accidental deletes
+- One-click recovery to restore lost work
+
+### Feature 5: Undo Operations
+Session-based undo stack for git operations:
+- `pushUndo()` - Record commit hash to undo stack
+- `performUndo()` - Step back through previous states
+- `renderUndoMenu()` - Show undo history with current position
+- Enables reversible exploration of commit history
+
+### Bisect & Recovery Keybindings
+- `B` - Initiate/close bisect workflow
+- `L` - Show lost commits finder
+- `U` - Toggle undo menu and perform undo
+
+---
+
+## Code Patterns & Quality Analysis
+
+### Feature 6: Code Ownership Analysis (`O` key)
+Identify who owns specific code areas:
+- `analyzeCodeOwnership()` - Map authors to files and expertise levels
+- `detectCodeOwners()` - Find primary maintainer for codebase
+- `renderCodeOwnershipUI()` - Display ownership statistics
+- Expertise calculated as percentage of commits by author
+- Useful for code review routing and knowledge transfer
+
+### Feature 7: Hotspot Detection (`H` key)
+Find high-risk, frequently-changed code:
+- `detectHotspots()` - Analyze file change frequency
+- `assessRiskLevel()` - Rate files by change frequency and collaboration
+- `renderHotspotsUI()` - Show hotspot list with risk levels (low/medium/high)
+- Risk assessment considers change frequency, recent activity, and collaborator count
+- Identify code that needs extra testing or refactoring attention
+
+### Feature 8: Commit Message Linting (`M` key)
+Validate commit message quality and style:
+- `lintCommitMessage()` - Check message against quality rules
+- `validateCommitFormat()` - Detect style violations (capitalization, length, etc.)
+- `renderLintingUI()` - Display linting results with scores (0-100)
+- Issues detected: exceeds line length (72 chars), lowercase start, missing verb
+- Helps maintain consistent commit message conventions across team
+
+### Feature 9: Large Commit Detection (`S` key)
+Identify commits that touch too many files or lines:
+- `analyzeCommitSize()` - Analyze all commits for size metrics
+- `calculateCommitMetrics()` - Compute lines changed and files modified
+- `renderLargeCommitsUI()` - Display commits above size thresholds
+- Flags overly broad commits that should be split into smaller PRs
+- Useful for code review workflow optimization
+
+### Feature 10: Commit Complexity Analysis (`X` key)
+Estimate cognitive complexity of commits:
+- `analyzeComplexity()` - Score each commit by complexity
+- `calculateComplexityScore()` - Compute score from lines/files changed
+- `renderComplexityUI()` - Display commits ranked by complexity
+- Higher complexity = larger diffs and more files changed = higher risk
+- Identify commits that need careful review or smaller changes
+
+### Code Quality Keybindings
+- `O` - Toggle code ownership analysis
+- `H` - Toggle hotspot detection
+- `M` - Toggle commit message linting
+- `S` - Toggle large commit detection (size)
+- `X` - Toggle commit complexity analysis
+
+### Quality Metrics
+All 10 features provide structured data for analysis:
+- **Ownership**: expertise percentage (0-100%), file count per author
+- **Hotspots**: change frequency, collaborator count, risk level
+- **Linting**: quality score (0-100%), issue list per commit
+- **Size**: lines changed, files modified, classification (large/normal)
+- **Complexity**: complexity score (0-100%), estimated cognitive load

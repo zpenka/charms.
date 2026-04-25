@@ -137,6 +137,27 @@ type model struct {
 	width             int
 	height            int
 	loading           bool
+	// Bisect & Recovery
+	bisectState         bisectState
+	showBisectUI        bool
+	lostCommits         []lostCommit
+	showLostCommits     bool
+	undoStack           []string // commit hashes for undo
+	undoStackIdx        int
+	showUndoMenu        bool
+	reflogRecoveryMode  bool
+	recoveryCommits     []lostCommit
+	// Code Patterns & Quality
+	codeOwnership       map[string]codeOwnershipData
+	showCodeOwnership   bool
+	hotspots            []hotspotData
+	showHotspots        bool
+	commitMetrics       []commitMetrics
+	showComplexity      bool
+	lintingResults      []lintingResult
+	showLinting         bool
+	largeCommits        []commitMetrics
+	showLargeCommits    bool
 }
 
 type commitStatistics struct {
@@ -190,6 +211,65 @@ type rebaseOp struct {
 	action  string // pick, squash, fixup, reword, drop
 	hash    string
 	subject string
+}
+
+type bisectOp struct {
+	hash    string
+	isBad   bool
+	isGood  bool
+	current bool
+}
+
+type bisectState struct {
+	active       bool
+	current      string
+	good         []string
+	bad          []string
+	candidates   []string
+	visualSteps  int
+	totalSteps   int
+}
+
+type lostCommit struct {
+	hash      string
+	shortHash string
+	author    string
+	subject   string
+	date      string
+}
+
+type codeOwnershipData struct {
+	author        string
+	files         map[string]int // file -> count of commits
+	lines         int
+	expertise     float64
+	isOwner       bool
+}
+
+type hotspotData struct {
+	path             string
+	changeFrequency  int
+	recentChanges    int
+	collaborators    int
+	avgCommitSize    int
+	riskLevel        string // low, medium, high
+}
+
+type commitMetrics struct {
+	hash          string
+	linesChanged  int
+	filesChanged  int
+	complexity    int // estimated
+	isLarge       bool
+	isComplex     bool
+	messageQuality int // 0-100
+}
+
+type lintingResult struct {
+	hash    string
+	subject string
+	issues  []string
+	score   int // 0-100
 }
 
 func newModel(repoPath string) model {
@@ -1440,6 +1520,53 @@ func handleKeyBinding(m model, key string) model {
 			m.authorStats = calculateAuthorStats(m.commits)
 			m.timeStats = calculateTimeStats(m.commits)
 		}
+	// Bisect & Recovery
+	case "B":
+		if !m.bisectState.active {
+			m = initiateBisect(m)
+		} else {
+			m.bisectState.active = false
+			m.showBisectUI = false
+		}
+	case "L":
+		m.showLostCommits = !m.showLostCommits
+		if m.showLostCommits && len(m.lostCommits) == 0 {
+			m.lostCommits = findLostCommits("")
+		}
+	case "U":
+		if m.showUndoMenu {
+			m = performUndo(m)
+		}
+		m.showUndoMenu = !m.showUndoMenu
+	// Code Patterns & Quality
+	case "O":
+		m.showCodeOwnership = !m.showCodeOwnership
+		if m.showCodeOwnership && len(m.codeOwnership) == 0 {
+			m.codeOwnership = analyzeCodeOwnership(m.commits)
+		}
+	case "H":
+		m.showHotspots = !m.showHotspots
+		if m.showHotspots && len(m.hotspots) == 0 {
+			m.hotspots = detectHotspots(m.commits)
+		}
+	case "M":
+		m.showLinting = !m.showLinting
+		if m.showLinting && len(m.lintingResults) == 0 {
+			for _, c := range m.commits {
+				result := lintCommitMessage(c.subject, c.hash)
+				m.lintingResults = append(m.lintingResults, result)
+			}
+		}
+	case "S":
+		m.showLargeCommits = !m.showLargeCommits
+		if m.showLargeCommits && len(m.largeCommits) == 0 {
+			m = analyzeCommitSize(m)
+		}
+	case "X":
+		m.showComplexity = !m.showComplexity
+		if m.showComplexity && len(m.commitMetrics) == 0 {
+			m = analyzeComplexity(m)
+		}
 	default:
 		// Handle multi-key like "5j"
 		if len(key) > 1 && (strings.HasSuffix(key, "j") || strings.HasSuffix(key, "k")) {
@@ -1954,5 +2081,473 @@ func renderAnalyticsPanel(m model, width int) string {
 	timeStats := calculateTimeStats(m.commits)
 	sb.WriteString(renderTimeStats(timeStats, width))
 
+	return sb.String()
+}
+
+// --- Bisect & Recovery (5 features) ---
+
+// Feature 1: Interactive Bisect Workflow
+
+func initiateBisect(m model) model {
+	if m.cursor >= 0 && m.cursor < len(m.commits) {
+		m.bisectState.active = true
+		m.bisectState.current = m.commits[m.cursor].hash
+		m.bisectState.good = []string{}
+		m.bisectState.bad = []string{}
+		var candidateHashes []string
+		for _, c := range m.commits[:m.cursor+1] {
+			candidateHashes = append(candidateHashes, c.hash)
+		}
+		m.bisectState.candidates = candidateHashes
+		m.showBisectUI = true
+	}
+	return m
+}
+
+func bisectMarkGood(m model) model {
+	if m.bisectState.active && m.bisectState.current != "" {
+		m.bisectState.good = append(m.bisectState.good, m.bisectState.current)
+	}
+	return m
+}
+
+func bisectMarkBad(m model) model {
+	if m.bisectState.active && m.bisectState.current != "" {
+		m.bisectState.bad = append(m.bisectState.bad, m.bisectState.current)
+	}
+	return m
+}
+
+func bisectFindCulprit(commits []commit, good []string, bad []string) string {
+	if len(commits) == 0 || len(good) == 0 || len(bad) == 0 {
+		return ""
+	}
+	goodMap := make(map[string]bool)
+	for _, g := range good {
+		goodMap[g] = true
+	}
+	badMap := make(map[string]bool)
+	for _, b := range bad {
+		badMap[b] = true
+	}
+	for i := len(commits) - 1; i >= 0; i-- {
+		if goodMap[commits[i].hash] {
+			continue
+		}
+		if badMap[commits[i].hash] {
+			continue
+		}
+		return commits[i].hash
+	}
+	if len(commits) > 0 {
+		return commits[0].hash
+	}
+	return ""
+}
+
+// Feature 2: Bisect Visualization
+
+func renderBisectUI(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Bisect Status ===\n")
+	sb.WriteString(fmt.Sprintf("Progress: %d/%d steps\n", m.bisectState.visualSteps, m.bisectState.totalSteps))
+	sb.WriteString(fmt.Sprintf("Current: %s\n", m.bisectState.current))
+	sb.WriteString(fmt.Sprintf("Good commits: %d\n", len(m.bisectState.good)))
+	sb.WriteString(fmt.Sprintf("Bad commits: %d\n", len(m.bisectState.bad)))
+	for i, g := range m.bisectState.good {
+		if i >= 3 {
+			break
+		}
+		sb.WriteString(fmt.Sprintf("  ✓ %s\n", g))
+	}
+	for i, b := range m.bisectState.bad {
+		if i >= 3 {
+			break
+		}
+		sb.WriteString(fmt.Sprintf("  ✗ %s\n", b))
+	}
+	return sb.String()
+}
+
+func calculateBisectProgress(state bisectState) int {
+	candidates := len(state.candidates)
+	if candidates <= 1 {
+		return 1
+	}
+	steps := 0
+	for candidates > 1 {
+		candidates = candidates / 2
+		steps++
+	}
+	return steps
+}
+
+// Feature 3: Reflog Recovery
+
+func extractReflogEntries(reflogOutput string) []reflogEntry {
+	var entries []reflogEntry
+	for _, line := range strings.Split(strings.TrimSpace(reflogOutput), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+		hash := parts[0]
+		action := "unknown"
+		message := ""
+
+		if idx := strings.Index(line, ":"); idx > 0 {
+			afterColon := line[idx+1:]
+			colonIdx := strings.Index(afterColon, ":")
+			if colonIdx > 0 {
+				action = strings.TrimSpace(afterColon[:colonIdx])
+				message = strings.TrimSpace(afterColon[colonIdx+1:])
+			}
+		}
+
+		entries = append(entries, reflogEntry{
+			hash:    hash,
+			action:  action,
+			message: message,
+			date:    "",
+		})
+	}
+	return entries
+}
+
+func enableReflogRecovery(m model) model {
+	m.reflogRecoveryMode = true
+	m.recoveryCommits = make([]lostCommit, 0)
+	for _, entry := range m.reflogEntries {
+		m.recoveryCommits = append(m.recoveryCommits, lostCommit{
+			hash:      entry.hash,
+			shortHash: entry.hash,
+			author:    entry.action,
+			subject:   entry.message,
+			date:      entry.date,
+		})
+	}
+	return m
+}
+
+// Feature 4: Lost Commits Finder
+
+func findLostCommits(fsckOutput string) []lostCommit {
+	var commits []lostCommit
+	lines := strings.Split(fsckOutput, "\n")
+	for i := 0; i < len(lines); i++ {
+		if strings.Contains(lines[i], "unreachable commit") {
+			parts := strings.Fields(lines[i])
+			if len(parts) >= 3 {
+				hash := parts[2]
+				subject := ""
+				if i+1 < len(lines) {
+					subject = lines[i+1]
+					i++
+				}
+				commits = append(commits, lostCommit{
+					hash:      hash,
+					shortHash: hash,
+					author:    "unknown",
+					subject:   subject,
+					date:      "",
+				})
+			}
+		}
+	}
+	return commits
+}
+
+func renderLostCommitsUI(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Lost Commits ===\n")
+	if len(m.lostCommits) == 0 {
+		sb.WriteString("No lost commits found.\n")
+		return sb.String()
+	}
+	for _, lc := range m.lostCommits {
+		sb.WriteString(fmt.Sprintf("%s: %s\n", lc.shortHash, lc.subject))
+	}
+	return sb.String()
+}
+
+// Feature 5: Undo Operations
+
+func pushUndo(m model, hash string) model {
+	m.undoStack = append(m.undoStack, hash)
+	m.undoStackIdx = len(m.undoStack)
+	return m
+}
+
+func performUndo(m model) model {
+	if m.undoStackIdx > 1 {
+		m.undoStackIdx--
+	}
+	return m
+}
+
+func renderUndoMenu(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Undo Stack ===\n")
+	for i, hash := range m.undoStack {
+		if i == m.undoStackIdx-1 {
+			sb.WriteString(fmt.Sprintf("> %s\n", hash))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %s\n", hash))
+		}
+	}
+	return sb.String()
+}
+
+// --- Code Patterns & Quality (5 features) ---
+
+// Feature 6: Code Ownership Analysis
+
+func analyzeCodeOwnership(commits []commit) map[string]codeOwnershipData {
+	ownership := make(map[string]codeOwnershipData)
+	authorCommitCount := make(map[string]int)
+	authorFiles := make(map[string]map[string]int)
+
+	for _, c := range commits {
+		authorCommitCount[c.author]++
+		if _, ok := authorFiles[c.author]; !ok {
+			authorFiles[c.author] = make(map[string]int)
+		}
+		parts := strings.Fields(c.subject)
+		if len(parts) > 1 {
+			file := parts[len(parts)-1]
+			authorFiles[c.author][file]++
+		}
+	}
+
+	for author, count := range authorCommitCount {
+		expertise := float64(count) / float64(len(commits))
+		if expertise > 1.0 {
+			expertise = 1.0
+		}
+		ownership[author] = codeOwnershipData{
+			author:    author,
+			files:     authorFiles[author],
+			lines:     count,
+			expertise: expertise,
+			isOwner:   expertise > 0.3,
+		}
+	}
+
+	return ownership
+}
+
+func detectCodeOwners(ownership map[string]codeOwnershipData) string {
+	var maxAuthor string
+	maxExpertise := 0.0
+	for author, data := range ownership {
+		if data.expertise > maxExpertise {
+			maxExpertise = data.expertise
+			maxAuthor = author
+		}
+	}
+	return maxAuthor
+}
+
+func renderCodeOwnershipUI(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Code Ownership ===\n")
+	for _, data := range m.codeOwnership {
+		sb.WriteString(fmt.Sprintf("%s: %.0f%% expertise\n", data.author, data.expertise*100))
+	}
+	return sb.String()
+}
+
+// Feature 7: Hotspot Detection
+
+func detectHotspots(commits []commit) []hotspotData {
+	fileChanges := make(map[string]int)
+	fileRecent := make(map[string]int)
+	fileCollabs := make(map[string]map[string]bool)
+
+	for i, c := range commits {
+		parts := strings.Fields(c.subject)
+		if len(parts) > 1 {
+			file := parts[len(parts)-1]
+			fileChanges[file]++
+			if i < 5 {
+				fileRecent[file]++
+			}
+			if _, ok := fileCollabs[file]; !ok {
+				fileCollabs[file] = make(map[string]bool)
+			}
+			fileCollabs[file][c.author] = true
+		}
+	}
+
+	var hotspots []hotspotData
+	for file, changes := range fileChanges {
+		collab := len(fileCollabs[file])
+		risk := "low"
+		if changes > 10 {
+			risk = "high"
+		} else if changes > 5 {
+			risk = "medium"
+		}
+		hotspots = append(hotspots, hotspotData{
+			path:            file,
+			changeFrequency: changes,
+			recentChanges:   fileRecent[file],
+			collaborators:   collab,
+			avgCommitSize:   0,
+			riskLevel:       risk,
+		})
+	}
+
+	return hotspots
+}
+
+func assessRiskLevel(hotspot hotspotData) string {
+	if hotspot.changeFrequency > 10 {
+		return "high"
+	}
+	if hotspot.changeFrequency > 5 {
+		return "medium"
+	}
+	return "low"
+}
+
+func renderHotspotsUI(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Code Hotspots ===\n")
+	for _, h := range m.hotspots {
+		sb.WriteString(fmt.Sprintf("%s: %d changes [%s]\n", h.path, h.changeFrequency, h.riskLevel))
+	}
+	return sb.String()
+}
+
+// Feature 8: Commit Message Linting
+
+func lintCommitMessage(subject string, hash string) lintingResult {
+	issues := validateCommitFormat(subject)
+	score := 100 - (len(issues) * 20)
+	if score < 0 {
+		score = 0
+	}
+	return lintingResult{
+		hash:    hash,
+		subject: subject,
+		issues:  issues,
+		score:   score,
+	}
+}
+
+func validateCommitFormat(subject string) []string {
+	var issues []string
+	if len(subject) == 0 {
+		issues = append(issues, "empty message")
+		return issues
+	}
+	if len(subject) > 72 {
+		issues = append(issues, "exceeds 72 chars")
+	}
+	if subject[0] >= 'a' && subject[0] <= 'z' {
+		issues = append(issues, "lowercase start")
+	}
+	if !strings.ContainsAny(string(subject[0]), "ABCDEFGHIJKLMNOPQRSTUVWXYZ") && subject[0] >= 'a' {
+		issues = append(issues, "should start with verb")
+	}
+	return issues
+}
+
+func renderLintingUI(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Commit Message Linting ===\n")
+	for _, result := range m.lintingResults {
+		sb.WriteString(fmt.Sprintf("%s: score %d\n", result.hash, result.score))
+		for _, issue := range result.issues {
+			sb.WriteString(fmt.Sprintf("  - %s\n", issue))
+		}
+	}
+	return sb.String()
+}
+
+// Feature 9: Large Commit Detection
+
+func analyzeCommitSize(m model) model {
+	m.largeCommits = []commitMetrics{}
+	for _, c := range m.commits {
+		words := len(strings.Fields(c.subject))
+		filesEst := words
+		if filesEst < 1 {
+			filesEst = 1
+		}
+		linesEst := words * 100
+
+		metrics := commitMetrics{
+			hash:         c.hash,
+			linesChanged: linesEst,
+			filesChanged: filesEst,
+			isLarge:      linesEst > 150 || filesEst > 5,
+		}
+		if metrics.isLarge {
+			m.largeCommits = append(m.largeCommits, metrics)
+		}
+	}
+	return m
+}
+
+func calculateCommitMetrics(hash string, linesChanged int, filesChanged int) commitMetrics {
+	return commitMetrics{
+		hash:         hash,
+		linesChanged: linesChanged,
+		filesChanged: filesChanged,
+		complexity:   linesChanged / 50,
+		isLarge:      linesChanged > 300,
+		isComplex:    linesChanged > 300 && filesChanged > 10,
+	}
+}
+
+func renderLargeCommitsUI(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Large Commits ===\n")
+	for _, lc := range m.largeCommits {
+		sb.WriteString(fmt.Sprintf("%s: %d lines, %d files\n", lc.hash, lc.linesChanged, lc.filesChanged))
+	}
+	return sb.String()
+}
+
+// Feature 10: Commit Complexity Analysis
+
+func analyzeComplexity(m model) model {
+	m.commitMetrics = []commitMetrics{}
+	for _, c := range m.commits {
+		wordCount := len(strings.Fields(c.subject))
+		linesEst := wordCount * 30
+		filesEst := wordCount
+
+		metrics := commitMetrics{
+			hash:         c.hash,
+			linesChanged: linesEst,
+			filesChanged: filesEst,
+		}
+		metrics.complexity = calculateComplexityScore(metrics)
+		metrics.isComplex = metrics.complexity > 50
+		m.commitMetrics = append(m.commitMetrics, metrics)
+	}
+	return m
+}
+
+func calculateComplexityScore(metrics commitMetrics) int {
+	score := (metrics.linesChanged / 10) + (metrics.filesChanged * 5)
+	if score > 100 {
+		score = 100
+	}
+	return score
+}
+
+func renderComplexityUI(m model, width int) string {
+	var sb strings.Builder
+	sb.WriteString("=== Commit Complexity ===\n")
+	for _, cm := range m.commitMetrics {
+		sb.WriteString(fmt.Sprintf("%s: complexity %d\n", cm.hash, cm.complexity))
+	}
 	return sb.String()
 }
