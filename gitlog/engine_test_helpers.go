@@ -167,3 +167,55 @@ var TestCategories = map[string]*TestCategory{
 	"Release":              &TestCategory{"Release & Versioning", 0},
 	"Performance":          &TestCategory{"Performance", 0},
 }
+
+// CommitBuilder provides a fluent builder pattern for creating test commits
+type CommitBuilder struct {
+	commit commit
+}
+
+// NewCommitBuilder creates a new commit builder with defaults
+func NewCommitBuilder() *CommitBuilder {
+	return &CommitBuilder{
+		commit: commit{
+			hash:      "0000000000000000000000000000000000000000",
+			shortHash: "0000000",
+			author:    "Test Author",
+			subject:   "Test Subject",
+			when:      "now",
+		},
+	}
+}
+
+// WithHash sets the commit hash
+func (cb *CommitBuilder) WithHash(hash string) *CommitBuilder {
+	cb.commit.hash = hash
+	if len(hash) >= 7 {
+		cb.commit.shortHash = hash[:7]
+	} else {
+		cb.commit.shortHash = hash
+	}
+	return cb
+}
+
+// WithAuthor sets the commit author
+func (cb *CommitBuilder) WithAuthor(author string) *CommitBuilder {
+	cb.commit.author = author
+	return cb
+}
+
+// WithSubject sets the commit subject
+func (cb *CommitBuilder) WithSubject(subject string) *CommitBuilder {
+	cb.commit.subject = subject
+	return cb
+}
+
+// WithWhen sets the commit date string
+func (cb *CommitBuilder) WithWhen(when string) *CommitBuilder {
+	cb.commit.when = when
+	return cb
+}
+
+// Build returns the constructed commit
+func (cb *CommitBuilder) Build() commit {
+	return cb.commit
+}
