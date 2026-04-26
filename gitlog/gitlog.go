@@ -159,7 +159,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.diffLines = []diffLine(msg)
 		m.diffOffset = 0
-		m.fileItems = parseFileItems(m.diffLines)
+		m.fileItems = parseFileItemsFromDiff(m.diffLines)
 		m.fileCursor = 0
 		m.showBlame = false
 		return m, nil

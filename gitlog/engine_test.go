@@ -298,10 +298,10 @@ func TestDiffPanelHeight_Minimum(t *testing.T) {
 	AssertTrue(t, diffPanelHeight(m) >= 5, "height should be at least 5")
 }
 
-// --- parseFileItems ---
+// --- parseFileItemsFromDiff ---
 
 func TestParseFileItems_Empty(t *testing.T) {
-	items := parseFileItems([]diffLine{
+	items := parseFileItemsFromDiff([]diffLine{
 		{lineContext, "context"},
 		{lineAdded, "+added"},
 	})
@@ -316,7 +316,7 @@ func TestParseFileItems_Single(t *testing.T) {
 		{lineMeta, "index abc..def 100644"},
 		{lineAdded, "+hello"},
 	}
-	items := parseFileItems(lines)
+	items := parseFileItemsFromDiff(lines)
 	if len(items) != 1 {
 		t.Fatalf("expected 1, got %d", len(items))
 	}
@@ -335,7 +335,7 @@ func TestParseFileItems_Multiple(t *testing.T) {
 		{lineMeta, "diff --git a/path/to/b.go b/path/to/b.go"},
 		{lineAdded, "+new"},
 	}
-	items := parseFileItems(lines)
+	items := parseFileItemsFromDiff(lines)
 	AssertLen(t, items, 2, "should parse 2 files")
 	AssertEqual(t, "a.go", items[0].path, "first path should match")
 	AssertEqual(t, 0, items[0].diffIdx, "first diffIdx should be 0")
@@ -349,7 +349,7 @@ func TestParseFileItems_SkipsNonDiffGit(t *testing.T) {
 		{lineMeta, "+++ b/foo.go"},
 		{lineMeta, "diff --git a/bar.go b/bar.go"},
 	}
-	items := parseFileItems(lines)
+	items := parseFileItemsFromDiff(lines)
 	AssertLen(t, items, 1, "should only parse diff --git lines")
 }
 
