@@ -27,14 +27,24 @@ func (c CacheMetrics) ShouldEvict() bool {
 
 // LazyLoader provides lazy initialization pattern
 type LazyLoader struct {
-	loaded bool
-	data   interface{}
+	loaded   bool
+	data     interface{}
+	loadFunc func() interface{}
+}
+
+// NewLazyLoader creates a lazy loader with initialization function
+func NewLazyLoader(fn func() interface{}) *LazyLoader {
+	return &LazyLoader{
+		loaded:   false,
+		data:     nil,
+		loadFunc: fn,
+	}
 }
 
 // Load initializes data if not already loaded
-func (l *LazyLoader) Load(fn func() interface{}) interface{} {
-	if !l.loaded {
-		l.data = fn()
+func (l *LazyLoader) Load() interface{} {
+	if !l.loaded && l.loadFunc != nil {
+		l.data = l.loadFunc()
 		l.loaded = true
 	}
 	return l.data

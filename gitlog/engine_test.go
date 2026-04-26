@@ -141,48 +141,33 @@ func TestParseDiff_TextPreserved(t *testing.T) {
 // --- truncate ---
 
 func TestTruncate_Short(t *testing.T) {
-	if truncate("hello", 10) != "hello" {
-		t.Error("should not truncate")
-	}
+	AssertEqual(t, "hello", truncate("hello", 10), "should not truncate")
 }
 
 func TestTruncate_Exact(t *testing.T) {
-	if truncate("hello", 5) != "hello" {
-		t.Error("exact length should not truncate")
-	}
+	AssertEqual(t, "hello", truncate("hello", 5), "exact length should not truncate")
 }
 
 func TestTruncate_Long(t *testing.T) {
-	got := truncate("hello world", 7)
-	if got != "hello …" {
-		t.Errorf("got %q", got)
-	}
+	AssertEqual(t, "hello …", truncate("hello world", 7), "should truncate with ellipsis")
 }
 
 func TestTruncate_One(t *testing.T) {
-	if truncate("hi", 1) != "…" {
-		t.Errorf("got %q", truncate("hi", 1))
-	}
+	AssertEqual(t, "…", truncate("hi", 1), "max=1 should return ellipsis")
 }
 
 func TestTruncate_Zero(t *testing.T) {
-	if truncate("hi", 0) != "" {
-		t.Errorf("got %q", truncate("hi", 0))
-	}
+	AssertEqual(t, "", truncate("hi", 0), "max=0 should return empty")
 }
 
 // --- firstWord ---
 
 func TestFirstWord_WithSpace(t *testing.T) {
-	if firstWord("John Doe") != "John" {
-		t.Errorf("got %q", firstWord("John Doe"))
-	}
+	AssertEqual(t, "John", firstWord("John Doe"), "should extract first word")
 }
 
 func TestFirstWord_NoSpace(t *testing.T) {
-	if firstWord("John") != "John" {
-		t.Errorf("got %q", firstWord("John"))
-	}
+	AssertEqual(t, "John", firstWord("John"), "single word should return as-is")
 }
 
 // --- cursor navigation ---
@@ -190,25 +175,19 @@ func TestFirstWord_NoSpace(t *testing.T) {
 func TestMoveCursorDown(t *testing.T) {
 	m := model{commits: makeCommits(3), cursor: 0}
 	m = moveCursorDown(m)
-	if m.cursor != 1 {
-		t.Errorf("expected 1, got %d", m.cursor)
-	}
+	AssertEqual(t, 1, m.cursor, "cursor should advance")
 }
 
 func TestMoveCursorDown_AtEnd(t *testing.T) {
 	m := model{commits: makeCommits(3), cursor: 2}
 	m = moveCursorDown(m)
-	if m.cursor != 2 {
-		t.Errorf("expected 2, got %d", m.cursor)
-	}
+	AssertEqual(t, 2, m.cursor, "cursor should clamp at end")
 }
 
 func TestMoveCursorDown_ResetsDiffOffset(t *testing.T) {
 	m := model{commits: makeCommits(3), cursor: 0, diffOffset: 10}
 	m = moveCursorDown(m)
-	if m.diffOffset != 0 {
-		t.Error("diffOffset should reset on commit change")
-	}
+	AssertEqual(t, 0, m.diffOffset, "diffOffset should reset on commit change")
 }
 
 func TestMoveCursorUp(t *testing.T) {
@@ -240,36 +219,27 @@ func TestMoveCursorUp_ResetsDiffOffset(t *testing.T) {
 func TestScrollDiffDown(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
 	m = scrollDiffDown(m, 5)
-	if m.diffOffset != 5 {
-		t.Errorf("expected 5, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 5, m.diffOffset, "should scroll down")
 }
 
 func TestScrollDiffUp(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 10, height: 30}
 	m = scrollDiffUp(m, 3)
-	if m.diffOffset != 7 {
-		t.Errorf("expected 7, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 7, m.diffOffset, "should scroll up")
 }
 
 func TestScrollDiffDown_ClampsToMax(t *testing.T) {
-	// height=30 → diffPanelHeight = 30-7 = 23, max = 50-23 = 27
 	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
 	m = scrollDiffDown(m, 1000)
 	panelH := diffPanelHeight(m)
 	expected := len(m.diffLines) - panelH
-	if m.diffOffset != expected {
-		t.Errorf("expected clamped to %d, got %d", expected, m.diffOffset)
-	}
+	AssertEqual(t, expected, m.diffOffset, "should clamp to max")
 }
 
 func TestScrollDiffUp_ClampsToZero(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 5, height: 30}
 	m = scrollDiffUp(m, 1000)
-	if m.diffOffset != 0 {
-		t.Errorf("expected 0, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 0, m.diffOffset, "should clamp to zero")
 }
 
 func TestScrollDiffDown_FitsInPanel(t *testing.T) {
@@ -286,62 +256,46 @@ func TestScrollDiffDown_FitsInPanel(t *testing.T) {
 func TestSwitchPanel_TowardsDiff(t *testing.T) {
 	m := model{focus: panelList}
 	m = switchPanel(m)
-	if m.focus != panelDiff {
-		t.Error("expected panelDiff")
-	}
+	AssertEqual(t, panelDiff, m.focus, "should switch to diff panel")
 }
 
 func TestSwitchPanel_TowardsList(t *testing.T) {
 	m := model{focus: panelDiff}
 	m = switchPanel(m)
-	if m.focus != panelList {
-		t.Error("expected panelList")
-	}
+	AssertEqual(t, panelList, m.focus, "should switch to list panel")
 }
 
 // --- panel sizing ---
 
 func TestListPanelWidth_Minimum(t *testing.T) {
-	if listPanelWidth(40) < 36 {
-		t.Error("should be at least 36")
-	}
+	AssertIntRange(t, listPanelWidth(40), 36, 52, "panel width should be in range")
 }
 
 func TestListPanelWidth_Maximum(t *testing.T) {
-	if listPanelWidth(300) > 52 {
-		t.Error("should be at most 52")
-	}
+	AssertTrue(t, listPanelWidth(300) <= 52, "panel width should be at most 52")
 }
 
 func TestListPanelWidth_ThirdOfWidth(t *testing.T) {
 	w := listPanelWidth(120)
-	if w < 36 || w > 52 {
-		t.Errorf("unexpected width %d for total=120", w)
-	}
+	AssertIntRange(t, w, 36, 52, "width for total=120 should be in range")
 }
 
 func TestDiffPanelWidth(t *testing.T) {
 	total := 120
 	lw := listPanelWidth(total)
 	dw := diffPanelWidth(total)
-	if lw+dw+1 != total {
-		t.Errorf("lw(%d) + dw(%d) + 1 != %d", lw, dw, total)
-	}
+	AssertEqual(t, total, lw+dw+1, "panel widths should sum to total")
 }
 
 func TestDiffPanelHeight_Normal(t *testing.T) {
 	m := model{height: 40}
 	h := diffPanelHeight(m)
-	if h != 33 { // 40 - 7
-		t.Errorf("expected 33, got %d", h)
-	}
+	AssertEqual(t, 33, h, "height should be 40-7=33")
 }
 
 func TestDiffPanelHeight_Minimum(t *testing.T) {
 	m := model{height: 5}
-	if diffPanelHeight(m) < 5 {
-		t.Error("should be at least 5")
-	}
+	AssertTrue(t, diffPanelHeight(m) >= 5, "height should be at least 5")
 }
 
 // --- parseFileItems ---
@@ -3954,9 +3908,7 @@ func TestBackgroundIndexing_BuildsIndex(t *testing.T) {
 // Feature 29: Lazy Blame Loading
 func TestLazyBlame_LoadsOnDemand(t *testing.T) {
 	blame := lazyLoadBlame("aaa", "main.go")
-	if blame == nil {
-		t.Error("should lazy load blame")
-	}
+	AssertNotNil(t, blame, "should lazy load blame")
 }
 
 // Feature 30: Memory Optimization
@@ -3964,7 +3916,20 @@ func TestMemoryOptimization_TracksUsage(t *testing.T) {
 	metrics := optimizeMemory([]commit{
 		{hash: "aaa", subject: "Fix"},
 	})
-	if metrics.usageBytes == 0 {
-		t.Error("should track memory")
-	}
+	AssertTrue(t, metrics.usageBytes > 0, "should track memory")
+}
+
+// --- Optimization: LazyLoader Pattern ---
+
+func TestLazyLoadAnalysis_DefersCost(t *testing.T) {
+	loader := NewLazyLoader(func() interface{} {
+		return detectHotspots([]commit{
+			{hash: "aaa", subject: "file1.go file2.go"},
+			{hash: "bbb", subject: "file1.go"},
+		})
+	})
+	AssertFalse(t, loader.IsLoaded(), "should not load immediately")
+	data := loader.Load()
+	AssertNotNil(t, data, "should load data on demand")
+	AssertTrue(t, loader.IsLoaded(), "should be marked loaded after Load()")
 }
