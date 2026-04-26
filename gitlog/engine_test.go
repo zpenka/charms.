@@ -4898,3 +4898,348 @@ func TestRenderDeveloperExperienceUI_DisplaysTools(t *testing.T) {
 	AssertTrue(t, len(ui) > 0, "DX UI should not be empty")
 	AssertStringContains(t, ui, "Developer", "should contain DX info")
 }
+
+// --- Option 1: Integration & External Data ---
+
+func TestIntegrateGitHubAPI_ConnectsToGitHub(t *testing.T) {
+	config := map[string]string{"token": "test_token", "org": "test_org"}
+	integration := integrateGitHubAPI(config)
+
+	AssertNotNil(t, integration, "should create GitHub integration")
+	AssertTrue(t, len(integration) > 0, "should have integration data")
+}
+
+func TestIntegrateGitLabAPI_ConnectsToGitLab(t *testing.T) {
+	config := map[string]string{"token": "test_token"}
+	integration := integrateGitLabAPI(config)
+
+	AssertNotNil(t, integration, "should create GitLab integration")
+}
+
+func TestFetchPullRequests_GetsPRs(t *testing.T) {
+	prs := fetchPullRequests("test_repo")
+	AssertNotNil(t, prs, "should fetch PRs")
+}
+
+func TestFetchIssues_GetsIssues(t *testing.T) {
+	issues := fetchIssues("test_repo")
+	AssertNotNil(t, issues, "should fetch issues")
+}
+
+func TestLinkToJira_ConnectsToJira(t *testing.T) {
+	config := map[string]string{"host": "jira.example.com", "key": "PROJECT"}
+	links := linkToJira(config)
+
+	AssertNotNil(t, links, "should create Jira links")
+}
+
+func TestLinkToLinear_ConnectsToLinear(t *testing.T) {
+	config := map[string]string{"api_key": "key", "team": "team"}
+	links := linkToLinear(config)
+
+	AssertNotNil(t, links, "should create Linear links")
+}
+
+func TestMapCommitsToIssues_CorrelatesData(t *testing.T) {
+	fixture := NewTestFixture()
+	mapping := mapCommitsToIssues(fixture.Commits)
+
+	AssertNotNil(t, mapping, "should map commits to issues")
+}
+
+func TestSendSlackNotification_PostsToSlack(t *testing.T) {
+	sent := sendSlackNotification("test_message", "test_channel")
+	AssertTrue(t, sent, "should send notification")
+}
+
+func TestSetupWebhooks_ConfiguresWebhooks(t *testing.T) {
+	success := setupWebhooks("https://example.com/webhooks")
+	AssertTrue(t, success, "should setup webhooks")
+}
+
+func TestSetupOIDC_ConfiguresAuth(t *testing.T) {
+	config := map[string]string{"provider": "okta", "client_id": "id"}
+	success := setupOIDC(config)
+
+	AssertTrue(t, success, "should setup OIDC")
+}
+
+func TestRenderIntegrationUI_DisplaysIntegrations(t *testing.T) {
+	ui := renderIntegrationUI()
+	AssertNotNil(t, ui, "should render integration UI")
+	AssertTrue(t, len(ui) > 0, "integration UI should not be empty")
+	AssertStringContains(t, ui, "Integration", "should contain integration info")
+}
+
+// --- Option 2: Team & Organizational Features ---
+
+func TestTrackSprintVelocity_MeasuresVelocity(t *testing.T) {
+	fixture := NewTestFixture()
+	velocity := trackSprintVelocity(fixture.Commits, "sprint-1")
+
+	AssertNotNil(t, velocity, "should track velocity")
+}
+
+func TestParseCodeowners_ReadsOwnership(t *testing.T) {
+	codeowners := parseCodeowners("CODEOWNERS content")
+	AssertNotNil(t, codeowners, "should parse CODEOWNERS")
+}
+
+func TestTrackFileOwnership_AssignsOwners(t *testing.T) {
+	ownership := trackFileOwnership("main.go")
+	AssertNotNil(t, ownership, "should track ownership")
+}
+
+func TestAnalyzeOnboardingMetrics_MeasuresRampUp(t *testing.T) {
+	fixture := NewTestFixture()
+	metrics := analyzeOnboardingMetrics(fixture.Commits, "new_author")
+
+	AssertNotNil(t, metrics, "should analyze metrics")
+}
+
+func TestCalculateTeamKnowledgeDistribution_MapExpertise(t *testing.T) {
+	fixture := NewTestFixture()
+	distribution := calculateTeamKnowledgeDistribution(fixture.Commits)
+
+	AssertNotNil(t, distribution, "should calculate distribution")
+}
+
+func TestDetectKnowledgeGaps_FindsGaps(t *testing.T) {
+	fixture := NewTestFixture()
+	gaps := detectKnowledgeGaps(fixture.Commits)
+
+	AssertNotNil(t, gaps, "should detect gaps")
+}
+
+func TestGenerateBurndownChart_CreatesBurndown(t *testing.T) {
+	fixture := NewTestFixture()
+	chart := generateBurndownChart(fixture.Commits, "sprint-1")
+
+	AssertNotNil(t, chart, "should generate chart")
+	AssertTrue(t, len(chart) > 0, "chart should not be empty")
+}
+
+func TestPlanTeamCapacity_EstimatesCapacity(t *testing.T) {
+	capacity := planTeamCapacity(5, 10)
+	AssertNotNil(t, capacity, "should plan capacity")
+}
+
+func TestCalculateTeamVelocityTrend_AnalyzesTrend(t *testing.T) {
+	trend := calculateTeamVelocityTrend()
+	AssertNotNil(t, trend, "should calculate trend")
+}
+
+func TestRenderTeamAnalyticsUI_DisplaysTeamStats(t *testing.T) {
+	ui := renderTeamAnalyticsUI()
+	AssertNotNil(t, ui, "should render team UI")
+	AssertTrue(t, len(ui) > 0, "team UI should not be empty")
+	AssertStringContains(t, ui, "Team", "should contain team metrics")
+}
+
+// --- Option 3: Quality & Compliance ---
+
+func TestValidateCommitMessages_ChecksMessages(t *testing.T) {
+	fixture := NewTestFixture()
+	validation := validateCommitMessages(fixture.Commits)
+
+	AssertNotNil(t, validation, "should validate messages")
+}
+
+func TestEnforceConventionalCommits_VerifyFormat(t *testing.T) {
+	fixture := NewTestFixture()
+	results := enforceConventionalCommits(fixture.Commits)
+
+	AssertNotNil(t, results, "should enforce format")
+}
+
+func TestDetectSemanticVersioning_IdentifiesVersions(t *testing.T) {
+	fixture := NewTestFixture()
+	versions := detectSemanticVersioning(fixture.Commits)
+
+	AssertNotNil(t, versions, "should detect versions")
+}
+
+func TestIdentifyBreakingChanges_FindsBreaks(t *testing.T) {
+	fixture := NewTestFixture()
+	breaks := identifyBreakingChanges(fixture.Commits)
+
+	AssertNotNil(t, breaks, "should identify breaks")
+}
+
+func TestTrackLicenseHeaders_ChecksLicenses(t *testing.T) {
+	files := []string{"file1.go", "file2.go"}
+	tracking := trackLicenseHeadersCompliance(files)
+
+	AssertNotNil(t, tracking, "should track licenses")
+}
+
+func TestEnforceLicenseCompliance_ValidatesCompliance(t *testing.T) {
+	compliance := enforceLicenseCompliance()
+	AssertNotNil(t, compliance, "should validate compliance")
+}
+
+func TestScanForSecurityIssues_FindsIssues(t *testing.T) {
+	fixture := NewTestFixture()
+	issues := scanForSecurityIssuesCompliance(fixture.Commits)
+
+	AssertNotNil(t, issues, "should scan for issues")
+}
+
+func TestIntegrateSASTScanning_RunsScan(t *testing.T) {
+	results := integrateSASTScanning("repo_path")
+	AssertNotNil(t, results, "should run SAST scan")
+}
+
+func TestGenerateComplianceReport_CreatesReport(t *testing.T) {
+	fixture := NewTestFixture()
+	report := generateComplianceReport(fixture.Commits)
+
+	AssertNotNil(t, report, "should generate report")
+	AssertTrue(t, len(report) > 0, "report should not be empty")
+}
+
+func TestAuditAllOperations_CreatesAuditLog(t *testing.T) {
+	log := auditAllOperations()
+	AssertNotNil(t, log, "should create audit log")
+}
+
+func TestRenderComplianceUI_DisplaysCompliance(t *testing.T) {
+	ui := renderComplianceUI()
+	AssertNotNil(t, ui, "should render compliance UI")
+	AssertTrue(t, len(ui) > 0, "compliance UI should not be empty")
+	AssertStringContains(t, ui, "Compliance", "should contain compliance info")
+}
+
+// --- Option 4: Data Export & Reporting ---
+
+func TestExportToCSV_CreatesCSV(t *testing.T) {
+	fixture := NewTestFixture()
+	csv := exportToCSV(fixture.Commits)
+
+	AssertNotNil(t, csv, "should export CSV")
+	AssertTrue(t, len(csv) > 0, "CSV should not be empty")
+}
+
+func TestExportToJSON_CreatesJSON(t *testing.T) {
+	fixture := NewTestFixture()
+	json := exportToJSON(fixture.Commits)
+
+	AssertNotNil(t, json, "should export JSON")
+	AssertTrue(t, len(json) > 0, "JSON should not be empty")
+}
+
+func TestExportToXML_CreatesXML(t *testing.T) {
+	fixture := NewTestFixture()
+	xml := exportToXML(fixture.Commits)
+
+	AssertNotNil(t, xml, "should export XML")
+	AssertTrue(t, len(xml) > 0, "XML should not be empty")
+}
+
+func TestGeneratePDFReport_CreatesPDF(t *testing.T) {
+	fixture := NewTestFixture()
+	pdf := generatePDFReport(fixture.Commits)
+
+	AssertNotNil(t, pdf, "should generate PDF")
+	AssertTrue(t, len(pdf) > 0, "PDF should not be empty")
+}
+
+func TestCreateCustomDashboard_BuildsDashboard(t *testing.T) {
+	config := map[string]interface{}{"title": "My Dashboard"}
+	dashboard := createCustomDashboard(config)
+
+	AssertNotNil(t, dashboard, "should create dashboard")
+}
+
+func TestScheduleEmailReport_SetsUpEmails(t *testing.T) {
+	success := scheduleEmailReport("daily", "user@example.com")
+	AssertTrue(t, success, "should schedule emails")
+}
+
+func TestGenerateSlackSummary_CreatesSlackMessage(t *testing.T) {
+	fixture := NewTestFixture()
+	summary := generateSlackSummary(fixture.Commits)
+
+	AssertNotNil(t, summary, "should generate summary")
+	AssertTrue(t, len(summary) > 0, "summary should not be empty")
+}
+
+func TestSetupScheduledExports_ConfiguresSchedules(t *testing.T) {
+	config := map[string]string{"schedule": "daily", "format": "json"}
+	success := setupScheduledExports(config)
+
+	AssertTrue(t, success, "should setup exports")
+}
+
+func TestArchiveOldReports_CleansUpArchives(t *testing.T) {
+	success := archiveOldReports(90)
+	AssertTrue(t, success, "should archive reports")
+}
+
+func TestRenderReportingUI_DisplaysReports(t *testing.T) {
+	ui := renderReportingUI()
+	AssertNotNil(t, ui, "should render reporting UI")
+	AssertTrue(t, len(ui) > 0, "reporting UI should not be empty")
+	AssertStringContains(t, ui, "Report", "should contain reporting info")
+}
+
+// --- Option 6: Real-time & WebSocket ---
+
+func TestStreamLiveCommits_StartStreaming(t *testing.T) {
+	stream := streamLiveCommits()
+	AssertNotNil(t, stream, "should start stream")
+}
+
+func TestSetupWebSocketServer_InitializesServer(t *testing.T) {
+	server := setupWebSocketServer(":8080")
+	AssertNotNil(t, server, "should setup server")
+}
+
+func TestBroadcastToClients_SendsMessages(t *testing.T) {
+	success := broadcastToClients("test message")
+	AssertTrue(t, success, "should broadcast message")
+}
+
+func TestTrackPresence_MonitorsUsers(t *testing.T) {
+	presence := trackPresence()
+	AssertNotNil(t, presence, "should track presence")
+}
+
+func TestEnableRealtimeLiveUpdates_StartsUpdates(t *testing.T) {
+	enabled := enableRealtimeLiveUpdates()
+	AssertTrue(t, enabled, "should enable updates")
+}
+
+func TestSetupLiveDashboard_CreatesDashboard(t *testing.T) {
+	success := setupLiveDashboard(":3000")
+	AssertTrue(t, success, "should setup dashboard")
+}
+
+func TestSubscribeToAlerts_CreatesSubscription(t *testing.T) {
+	subscription := subscribeToAlerts("user123", "bug_risk")
+	AssertNotNil(t, subscription, "should create subscription")
+}
+
+func TestConfigureAlertRouting_SetsUpRouting(t *testing.T) {
+	config := map[string]string{"channel": "slack", "threshold": "high"}
+	success := configureAlertRouting(config)
+
+	AssertTrue(t, success, "should setup routing")
+}
+
+func TestSetupEventDrivenTriggers_ConfiguresEvents(t *testing.T) {
+	success := setupEventDrivenTriggers()
+	AssertTrue(t, success, "should setup events")
+}
+
+func TestCreateAutomationWorkflow_BuildsWorkflow(t *testing.T) {
+	workflow := createAutomationWorkflow("on-merge", "notify-slack")
+	AssertNotNil(t, workflow, "should create workflow")
+}
+
+func TestRenderRealtimeUI_DisplaysRealtime(t *testing.T) {
+	ui := renderRealtimeUI()
+	AssertNotNil(t, ui, "should render realtime UI")
+	AssertTrue(t, len(ui) > 0, "realtime UI should not be empty")
+	AssertStringContains(t, ui, "Realtime", "should contain realtime info")
+}
