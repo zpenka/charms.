@@ -6,7 +6,9 @@ import (
 	"strings"
 )
 
-// truncate shortens a string to max characters, appending "…" if truncated.
+// truncate shortens a string to a maximum width in runes.
+// If the string exceeds max length, it is truncated and "…" is appended.
+// Properly handles Unicode characters by counting runes not bytes.
 func truncate(s string, max int) string {
 	r := []rune(s)
 	if max <= 0 {
@@ -22,6 +24,7 @@ func truncate(s string, max int) string {
 }
 
 // firstWord returns the first space-delimited word of a string.
+// Returns the entire string if it contains no spaces.
 func firstWord(s string) string {
 	if i := strings.Index(s, " "); i >= 0 {
 		return s[:i]
@@ -29,7 +32,9 @@ func firstWord(s string) string {
 	return s
 }
 
-// parseCount parses a string as an integer, clamping between 1 and 200.
+// parseCount parses a string as a navigation count with bounds [1, 200].
+// Empty strings, invalid numbers, or out-of-range values default to 1.
+// Used for repeat counts in keyboard navigation (e.g., "5j" = 5 lines down).
 func parseCount(s string) int {
 	if s == "" {
 		return 1
@@ -44,7 +49,9 @@ func parseCount(s string) int {
 	return n
 }
 
-// parseGitReferences extracts GitHub-style references (#123) from text.
+// parseGitReferences extracts GitHub issue/PR references (#123) from text.
+// Returns unique references in order of appearance.
+// Useful for linking commits to issues and pull requests.
 func parseGitReferences(msg string) []string {
 	re := regexp.MustCompile(`#(\d+)`)
 	matches := re.FindAllStringSubmatch(msg, -1)
@@ -59,7 +66,9 @@ func parseGitReferences(msg string) []string {
 	return refs
 }
 
-// parseBranches extracts branch names from "git branch" output.
+// parseBranches extracts branch names from git branch output.
+// Removes the current branch marker (*) and filters out ref pointers (HEAD -> ...).
+// Returns clean branch names suitable for display and navigation.
 func parseBranches(output string) []string {
 	var branches []string
 	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
@@ -76,7 +85,9 @@ func parseBranches(output string) []string {
 	return branches
 }
 
-// parseCurrentBranch returns the currently checked-out branch from "git branch" output.
+// parseCurrentBranch returns the currently checked-out branch name.
+// Finds the line prefixed with "* " in git branch output.
+// Returns empty string if no current branch found.
 func parseCurrentBranch(output string) string {
 	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
 		if strings.HasPrefix(line, "* ") {
@@ -86,7 +97,9 @@ func parseCurrentBranch(output string) string {
 	return ""
 }
 
-// parseBlameLine parses one line of "git blame --date=short" output.
+// parseBlameLine parses a single line from git blame --date=short output.
+// Format: "hash (Author Name   YYYY-MM-DD  linenum) content"
+// Returns (blameLine, true) on success, (_, false) if parsing fails.
 func parseBlameLine(line string) (blameLine, bool) {
 	paren := strings.Index(line, "(")
 	close := strings.Index(line, ")")
@@ -123,7 +136,9 @@ func parseBlameLine(line string) (blameLine, bool) {
 	}, true
 }
 
-// parseBlame parses all lines from "git blame --date=short" output.
+// parseBlame parses all lines from git blame --date=short output.
+// Silently skips any malformed lines.
+// Returns a slice of blameLine with valid blame information.
 func parseBlame(output string) []blameLine {
 	var lines []blameLine
 	for _, line := range strings.Split(output, "\n") {
@@ -134,7 +149,9 @@ func parseBlame(output string) []blameLine {
 	return lines
 }
 
-// isMergeCommit checks if a commit is a merge based on diff lines.
+// isMergeCommit detects if a commit is a merge commit from diff lines.
+// Checks for "Merge:" prefix or "merge branch" text in diff metadata.
+// Useful for visualizing merge commits differently in the UI.
 func isMergeCommit(lines []diffLine) bool {
 	for _, line := range lines {
 		if strings.HasPrefix(line.text, "Merge:") {
