@@ -4,8 +4,10 @@ import (
 	"strings"
 )
 
-// parseCommits parses git log output into commit structs
-// Input format: hash\x00shortHash\x00author\x00when\x00subject\n
+// parseCommits parses git log output into commit structures.
+// The input format uses null bytes to separate fields:
+// hash\x00shortHash\x00author\x00when\x00subject\n per line.
+// Returns nil if input is empty or contains no valid commits.
 func parseCommits(input string) []commit {
 	if input == "" {
 		return nil
@@ -40,7 +42,9 @@ func parseCommits(input string) []commit {
 	return commits
 }
 
-// parseDiff parses a unified diff into individual lines
+// parseDiff parses a unified diff format into individual classified lines.
+// Each line is categorized (added, removed, context, hunk, meta) based on its prefix.
+// Returns a slice of diffLine with appropriate lineKind classifications.
 func parseDiff(diff string) []diffLine {
 	var lines []diffLine
 	for _, line := range strings.Split(diff, "\n") {
@@ -69,7 +73,9 @@ func parseDiff(diff string) []diffLine {
 	return lines
 }
 
-// parseFileItems extracts file changes from commits
+// parseFileItems extracts file items from commits based on commit subjects.
+// Assumes commit subject contains the file path.
+// Returns fileItems indexed by commit position for diff navigation.
 func parseFileItems(commits []commit) []fileItem {
 	var items []fileItem
 	for i, c := range commits {

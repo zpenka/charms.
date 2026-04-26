@@ -6,8 +6,9 @@ import (
 	"strings"
 )
 
-// filterCommits returns commits whose subject, author, or short hash contain
-// query (case-insensitive). An empty query returns all commits unchanged.
+// filterCommits returns commits matching the search query.
+// Searches subject, author, and short hash (all case-insensitive).
+// Empty query returns all commits unchanged.
 func filterCommits(commits []commit, query string) []commit {
 	if query == "" {
 		return commits
@@ -24,7 +25,9 @@ func filterCommits(commits []commit, query string) []commit {
 	return out
 }
 
-// filterCommitsByAuthor returns commits matching the exact author name (case-insensitive).
+// filterCommitsByAuthor returns commits from a specific author.
+// Performs exact match (case-insensitive) on the author field.
+// Empty author returns all commits unchanged.
 func filterCommitsByAuthor(commits []commit, author string) []commit {
 	if author == "" {
 		return commits
@@ -38,9 +41,9 @@ func filterCommitsByAuthor(commits []commit, author string) []commit {
 	return out
 }
 
-// filterCommitsSince returns commits from the last N days, parsed from the
-// "when" field (e.g., "5 days ago", "2 weeks ago"). Returns all commits if
-// days <= 0.
+// filterCommitsSince returns commits from the last N days.
+// Parses relative time strings like "5 days ago" and "2 weeks ago" from the when field.
+// Returns all commits if days <= 0.
 func filterCommitsSince(commits []commit, days int) []commit {
 	if days <= 0 {
 		return commits
@@ -54,8 +57,9 @@ func filterCommitsSince(commits []commit, days int) []commit {
 	return out
 }
 
-// isWithinDays checks if a "when" string (e.g., "5 days ago") represents
-// a time within the last N days.
+// isWithinDays checks if a relative time string represents a date within N days.
+// Supports time units: days, weeks, months, years.
+// Example: "5 days ago", "2 weeks ago".
 func isWithinDays(when string, days int) bool {
 	whenLower := strings.ToLower(when)
 
@@ -89,7 +93,8 @@ func isWithinDays(when string, days int) bool {
 	return totalDays <= days
 }
 
-// filterByRegex filters commits by regex pattern matching against the subject.
+// filterByRegex returns commits whose subject matches the regex pattern.
+// Returns nil if the pattern is invalid.
 func filterByRegex(commits []commit, pattern string) []commit {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -105,7 +110,8 @@ func filterByRegex(commits []commit, pattern string) []commit {
 	return result
 }
 
-// filterByDateRange returns commits within the specified day range (inclusive).
+// filterByDateRange returns commits with relative age between startDays and endDays.
+// Both bounds are inclusive. Uses parseDaysAgo to extract numeric age from when field.
 func filterByDateRange(commits []commit, startDays, endDays int) []commit {
 	var result []commit
 	for _, c := range commits {
@@ -117,7 +123,8 @@ func filterByDateRange(commits []commit, startDays, endDays int) []commit {
 	return result
 }
 
-// filterByExtension returns commits whose subject contains the given extension.
+// filterByExtension returns commits whose subject contains the file extension.
+// Used to filter commits by affected file types (e.g., ".go", ".js").
 func filterByExtension(commits []commit, ext string) []commit {
 	var filtered []commit
 	for _, c := range commits {
@@ -128,7 +135,8 @@ func filterByExtension(commits []commit, ext string) []commit {
 	return filtered
 }
 
-// parseDaysAgo extracts the number of days from a "when" string.
+// parseDaysAgo extracts the numeric age in days from a relative time string.
+// Returns 0 if unable to parse. Used by filterByDateRange.
 func parseDaysAgo(when string) int {
 	parts := strings.Fields(when)
 	if len(parts) < 2 {
