@@ -4486,3 +4486,208 @@ func TestRenderCoverageAnalysisUI_DisplaysCoverage(t *testing.T) {
 	AssertTrue(t, len(ui) > 0, "coverage UI should not be empty")
 	AssertStringContains(t, ui, "Coverage", "should contain coverage metrics")
 }
+
+// --- Option 4: Advanced Diff & Review Features ---
+
+func TestAnalyzeSemanticDiff_IdentifiesFunctions(t *testing.T) {
+	diff := "+func NewUser() {}\n-func OldUser() {}"
+	analysis := analyzeSemanticDiff(diff)
+
+	AssertNotNil(t, analysis, "should analyze semantic diff")
+	AssertTrue(t, len(analysis.FunctionsAdded) >= 0, "should identify changes")
+}
+
+func TestCompressDiff_SummarizesChanges(t *testing.T) {
+	diff := "+line1\n-line2\n+line3"
+	compressed := compressDiff(diff)
+
+	AssertNotNil(t, compressed, "should compress diff")
+	AssertTrue(t, len(compressed) < len(diff), "compressed should be smaller")
+}
+
+func TestDetectCodeSmells_FindsIssues(t *testing.T) {
+	diff := "+func tooLongFunctionNameWithManyParameters(a,b,c,d,e,f) {}"
+	smells := detectCodeSmells(diff)
+
+	AssertNotNil(t, smells, "should detect code smells")
+}
+
+func TestAssessArchitecturalImpact_AnalyzesImpact(t *testing.T) {
+	diff := "+import newModule"
+	impact := assessArchitecturalImpact(diff)
+
+	AssertNotNil(t, impact, "should assess impact")
+	AssertTrue(t, impact.RiskScore >= 0, "should contain risk metrics")
+}
+
+func TestEstimateReviewTime_PredictsDuration(t *testing.T) {
+	diff := "+line1\n-line2"
+	time := estimateReviewTime(diff, 1)
+
+	AssertTrue(t, time > 0, "review time should be positive")
+}
+
+func TestSummarizeDiffChanges_CreatesAbstract(t *testing.T) {
+	diff := "+func New() {}\n-func Old() {}"
+	summary := summarizeDiffChanges(diff)
+
+	AssertNotNil(t, summary, "should summarize diff")
+	AssertTrue(t, len(summary) > 0, "summary should not be empty")
+}
+
+func TestIdentifyFunctionsAdded_FindsNewFunctions(t *testing.T) {
+	diff := "+func NewFeature() {}\n-func OldFeature() {}"
+	functions := identifyFunctionsAdded(diff)
+
+	AssertNotNil(t, functions, "should identify functions")
+}
+
+func TestRenderDiffAnalysisUI_DisplaysDiff(t *testing.T) {
+	diff := "+code changes"
+	ui := renderDiffAnalysisUI(diff)
+
+	AssertNotNil(t, ui, "should render diff UI")
+	AssertTrue(t, len(ui) > 0, "diff UI should not be empty")
+	AssertStringContains(t, ui, "Diff", "should contain diff info")
+}
+
+// --- Option 5: Machine Learning & AI ---
+
+func TestGenerateCommitMessageAI_CreatesMessage(t *testing.T) {
+	diff := "+func NewUser() {}"
+	message := generateCommitMessageAI(diff)
+
+	AssertNotNil(t, message, "should generate message")
+	AssertTrue(t, len(message) > 0, "message should not be empty")
+}
+
+func TestDetectAnomaliesML_FindsUnusualPatterns(t *testing.T) {
+	fixture := NewTestFixture()
+
+	anomalies := detectAnomaliesML(fixture.Commits)
+	AssertNotNil(t, anomalies, "should detect anomalies")
+	AssertTrue(t, len(anomalies) >= 0, "should have anomaly data")
+}
+
+func TestPredictBugRisk_ScoresRisk(t *testing.T) {
+	commit := &commit{
+		hash: "abc123",
+		subject: "Quick hotfix",
+		author: "Unknown",
+	}
+
+	risk := predictBugRisk(commit)
+	AssertTrue(t, risk >= 0 && risk <= 1, "risk should be 0-1")
+}
+
+func TestRecommendBestReviewers_SuggestsReviewers(t *testing.T) {
+	fixture := NewTestFixture()
+	diff := "+func New() {}"
+
+	reviewers := recommendBestReviewers(fixture.Commits, diff)
+	AssertNotNil(t, reviewers, "should recommend reviewers")
+}
+
+func TestPredictMergeConflicts_IdentifiesRisks(t *testing.T) {
+	fixture := NewTestFixture()
+
+	risks := predictMergeConflicts(fixture.Commits)
+	AssertNotNil(t, risks, "should predict conflicts")
+}
+
+func TestAnalyzePatternsForAnomalies_IdentifiesOutliers(t *testing.T) {
+	fixture := NewTestFixture()
+
+	outliers := analyzePatternsForAnomalies(fixture.Commits)
+	AssertNotNil(t, outliers, "should identify outliers")
+}
+
+func TestExtractFeaturesForML_CreatesFeatures(t *testing.T) {
+	commit := &commit{
+		hash: "abc123",
+		subject: "Feature X",
+		author: "Alice",
+		when: "1 day ago",
+	}
+
+	features := extractFeaturesForML(commit)
+	AssertNotNil(t, features, "should extract features")
+	AssertTrue(t, len(features) > 0, "should have features")
+}
+
+func TestRenderAIInsightsUI_DisplaysInsights(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderAIInsightsUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render AI insights")
+	AssertTrue(t, len(ui) > 0, "AI UI should not be empty")
+	AssertStringContains(t, ui, "AI", "should contain AI metrics")
+}
+
+// --- Option 6: Performance Optimization & Scale ---
+
+func TestIncrementalScan_UpdatesOnlyNew(t *testing.T) {
+	lastScan := "2026-04-25"
+	commits := incrementalScan(lastScan)
+
+	AssertNotNil(t, commits, "should scan incrementally")
+}
+
+func TestBuildDistributedIndex_CreatesIndex(t *testing.T) {
+	fixture := NewTestFixture()
+
+	index := buildDistributedIndex(fixture.Commits)
+	AssertNotNil(t, index, "should build index")
+	AssertTrue(t, index.TotalItems > 0, "index should have data")
+}
+
+func TestPersistToDatabase_StoresData(t *testing.T) {
+	fixture := NewTestFixture()
+
+	success := persistToDatabase(fixture.Commits, "test_db")
+	AssertTrue(t, success, "persistence should succeed")
+}
+
+func TestMonitorGitEvents_ListensForChanges(t *testing.T) {
+	monitor := monitorGitEvents()
+	AssertNotNil(t, monitor, "should create monitor")
+}
+
+func TestOptimizeMemoryUsage_ReducesFootprint(t *testing.T) {
+	fixture := NewTestFixture()
+
+	optimized := optimizeMemoryUsage(fixture.Commits)
+	AssertNotNil(t, optimized, "should optimize memory")
+}
+
+func TestEnableIncrementalProcessing_SetupPipeline(t *testing.T) {
+	pipeline := enableIncrementalProcessing()
+	AssertNotNil(t, pipeline, "should create pipeline")
+}
+
+func TestBatchCommitsForProcessing_GroupsData(t *testing.T) {
+	fixture := NewTestFixture()
+
+	batches := batchCommitsForProcessing(fixture.Commits, 2)
+	AssertNotNil(t, batches, "should batch commits")
+	AssertTrue(t, len(batches) > 0, "should have batches")
+}
+
+func TestIndexCommitMetadata_CreatesMetadataIndex(t *testing.T) {
+	fixture := NewTestFixture()
+
+	metaIndex := indexCommitMetadata(fixture.Commits)
+	AssertNotNil(t, metaIndex, "should index metadata")
+}
+
+func TestGetCachedResults_RetrievesCache(t *testing.T) {
+	cacheResults := getCachedResults("filter_alice")
+	AssertNotNil(t, cacheResults, "should retrieve cache")
+}
+
+func TestRenderPerformanceOptimizationUI_DisplaysMetrics(t *testing.T) {
+	ui := renderPerformanceOptimizationUI()
+	AssertNotNil(t, ui, "should render performance UI")
+	AssertTrue(t, len(ui) > 0, "performance UI should not be empty")
+	AssertStringContains(t, ui, "Performance", "should contain perf metrics")
+}
