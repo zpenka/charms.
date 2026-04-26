@@ -50,3 +50,9 @@ type blameLine struct {
 	lineNum   int    // Line number in the file
 	text      string // Line content
 }
+
+// commitGroup represents a group of commits organized by a criteria
+type commitGroup struct {
+	name           string   // Group name/key
+	commitHashes   []string // Commit hashes in this group
+}
