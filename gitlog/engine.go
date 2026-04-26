@@ -773,6 +773,7 @@ type memoryMetrics struct {
 	estimatedMax  int64
 }
 
+// newModel creates a fresh model instance for the given repository path.
 func newModel(repoPath string) model {
 	return model{
 		repoPath: repoPath,
@@ -834,6 +835,7 @@ func parseDiff(raw string) []diffLine {
 }
 
 // truncate cuts s to at most max visible runes, appending "…" if shortened.
+// truncate shortens a string to max runes and appends "…" if truncated.
 func truncate(s string, max int) string {
 	r := []rune(s)
 	if max <= 0 {
@@ -856,6 +858,7 @@ func firstWord(s string) string {
 	return s
 }
 
+// moveCursorDown advances the commit cursor by one position and resets diff offset.
 func moveCursorDown(m model) model {
 	if m.cursor < len(m.commits)-1 {
 		m.cursor++
@@ -864,6 +867,7 @@ func moveCursorDown(m model) model {
 	return m
 }
 
+// moveCursorUp moves the commit cursor back one position and resets diff offset.
 func moveCursorUp(m model) model {
 	if m.cursor > 0 {
 		m.cursor--
@@ -872,6 +876,7 @@ func moveCursorUp(m model) model {
 	return m
 }
 
+// scrollDiffDown scrolls the diff view down by n lines, clamped to valid range.
 func scrollDiffDown(m model, n int) model {
 	maxOff := len(m.diffLines) - diffPanelHeight(m)
 	if maxOff < 0 {
@@ -884,6 +889,7 @@ func scrollDiffDown(m model, n int) model {
 	return m
 }
 
+// scrollDiffUp scrolls the diff view up by n lines, clamped to zero.
 func scrollDiffUp(m model, n int) model {
 	m.diffOffset -= n
 	if m.diffOffset < 0 {
@@ -892,6 +898,7 @@ func scrollDiffUp(m model, n int) model {
 	return m
 }
 
+// switchPanel toggles focus between commit list and diff panels.
 func switchPanel(m model) model {
 	if m.focus == panelList {
 		m.focus = panelDiff
@@ -919,6 +926,7 @@ func diffPanelWidth(totalWidth int) int {
 }
 
 // diffPanelHeight returns the number of content lines visible in each panel.
+// diffPanelHeight calculates the height of the diff panel based on terminal size.
 func diffPanelHeight(m model) int {
 	h := m.height - 7 // title + blank + header + blank + hint + blank*2
 	if h < 5 {
@@ -1087,6 +1095,7 @@ func parseBlame(output string) []blameLine {
 
 // currentFile returns the path of the file whose diff section is currently
 // visible, based on the last fileItem whose diffIdx is <= diffOffset.
+// currentFile returns the path of the currently selected file in file view mode.
 func currentFile(m model) string {
 	if len(m.fileItems) == 0 {
 		return ""
@@ -1193,6 +1202,7 @@ func isWithinDays(when string, days int) bool {
 }
 
 // formatActiveFilters returns a string showing all active filters.
+// formatActiveFilters returns a display string of all active filters.
 func formatActiveFilters(m model) string {
 	var filters []string
 	if m.authorFilter != "" {
@@ -1237,6 +1247,7 @@ func goForwardInHistory(m model) model {
 }
 
 // commitStats calculates statistics for a commit's diff.
+// commitStats calculates insertion, deletion, and file change counts from diff lines.
 func commitStats(lines []diffLine) commitStatistics {
 	var stats commitStatistics
 	for _, line := range lines {
@@ -1301,6 +1312,7 @@ func generateCommitMessage(lines []diffLine, filename string) string {
 }
 
 // filenameToScope extracts a scope from a filename (e.g., "auth.go" -> "auth").
+// filenameToScope extracts the directory scope from a file path for navigation.
 func filenameToScope(filename string) string {
 	if filename == "" {
 		return ""
@@ -1425,6 +1437,7 @@ func detectLanguage(filename string) string {
 }
 
 // miniMapPosition calculates the position of a scroll indicator (0-height).
+// miniMapPosition calculates the position indicator for a visual minimap of commits.
 func miniMapPosition(cursor, panelHeight, totalCommits int) int {
 	if totalCommits <= 1 {
 		return 0
@@ -1462,6 +1475,7 @@ func diffStatBadge(stats commitStatistics) string {
 }
 
 // pluralize returns "s" if count != 1, else "".
+// pluralize returns "s" if count != 1, else empty string, for grammatical pluralization.
 func pluralize(count int) string {
 	if count != 1 {
 		return "s"
@@ -1472,6 +1486,7 @@ func pluralize(count int) string {
 // --- goToCommit ---
 
 // goToCommit finds a commit by hash (short or full) and returns its index, or -1 if not found.
+// goToCommit searches commits for a matching hash or subject and returns its index.
 func goToCommit(commits []commit, query string) int {
 	q := strings.ToLower(query)
 	for i, c := range commits {
@@ -1488,6 +1503,7 @@ func goToCommit(commits []commit, query string) int {
 // --- copyAsPatch ---
 
 // copyAsPatch generates a patch file format from a commit hash and diff lines.
+// copyAsPatch formats diff lines as a git patch with headers.
 func copyAsPatch(hash string, lines []diffLine) string {
 	var sb strings.Builder
 	sb.WriteString("From: " + hash + "\n")
@@ -1520,6 +1536,7 @@ func parseGitReferences(msg string) []string {
 // --- isMergeCommit ---
 
 // isMergeCommit checks if a commit is a merge commit.
+// isMergeCommit detects if a commit is a merge based on diff metadata.
 func isMergeCommit(lines []diffLine) bool {
 	for _, line := range lines {
 		if strings.HasPrefix(line.text, "Merge:") {
@@ -1535,6 +1552,7 @@ func isMergeCommit(lines []diffLine) bool {
 // --- getMergeParents ---
 
 // getMergeParents extracts parent hashes from a merge commit.
+// getMergeParents extracts the parent commit hashes from a merge commit's diff.
 func getMergeParents(lines []diffLine) []string {
 	for _, line := range lines {
 		if strings.HasPrefix(line.text, "Merge:") {
@@ -2752,26 +2770,15 @@ func bisectFindCulprit(commits []commit, good []string, bad []string) string {
 
 // Feature 2: Bisect Visualization
 
+// renderBisectUI displays bisect state and progress using the analysis UI template.
 func renderBisectUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Bisect Status ===\n")
-	sb.WriteString(fmt.Sprintf("Progress: %d/%d steps\n", m.bisectState.visualSteps, m.bisectState.totalSteps))
-	sb.WriteString(fmt.Sprintf("Current: %s\n", m.bisectState.current))
-	sb.WriteString(fmt.Sprintf("Good commits: %d\n", len(m.bisectState.good)))
-	sb.WriteString(fmt.Sprintf("Bad commits: %d\n", len(m.bisectState.bad)))
-	for i, g := range m.bisectState.good {
-		if i >= 3 {
-			break
-		}
-		sb.WriteString(fmt.Sprintf("  ✓ %s\n", g))
+	data := map[string]interface{}{
+		"Progress":       fmt.Sprintf("%d/%d steps", m.bisectState.visualSteps, m.bisectState.totalSteps),
+		"Current":        m.bisectState.current,
+		"Good commits":   strings.Join(m.bisectState.good, ", "),
+		"Bad commits":    strings.Join(m.bisectState.bad, ", "),
 	}
-	for i, b := range m.bisectState.bad {
-		if i >= 3 {
-			break
-		}
-		sb.WriteString(fmt.Sprintf("  ✗ %s\n", b))
-	}
-	return sb.String()
+	return RenderAnalysisUI("Bisect Status", data)
 }
 
 func calculateBisectProgress(state bisectState) int {
@@ -2956,13 +2963,13 @@ func detectCodeOwners(ownership map[string]codeOwnershipData) string {
 	return maxAuthor
 }
 
+// renderCodeOwnershipUI displays code ownership statistics using the standard analysis UI template.
 func renderCodeOwnershipUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Code Ownership ===\n")
-	for _, data := range m.codeOwnership {
-		sb.WriteString(fmt.Sprintf("%s: %.0f%% expertise\n", data.author, data.expertise*100))
+	data := make(map[string]interface{})
+	for _, ownership := range m.codeOwnership {
+		data[ownership.author] = ownership.expertise
 	}
-	return sb.String()
+	return RenderAnalysisUI("Code Ownership", data)
 }
 
 // Feature 7: Hotspot Detection
@@ -3019,13 +3026,21 @@ func assessRiskLevel(hotspot hotspotData) string {
 	return "low"
 }
 
+// renderHotspotsUI displays code hotspots and risk levels using the standard UI template.
 func renderHotspotsUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Code Hotspots ===\n")
+	var items []string
+	statusMap := make(map[string]string)
 	for _, h := range m.hotspots {
-		sb.WriteString(fmt.Sprintf("%s: %d changes [%s]\n", h.path, h.changeFrequency, h.riskLevel))
+		item := fmt.Sprintf("%s: %d changes", h.path, h.changeFrequency)
+		items = append(items, item)
+		statusMap[item] = h.riskLevel
 	}
-	return sb.String()
+	return RenderStandardUI(RenderConfig{
+		Title:     "Code Hotspots",
+		Items:     items,
+		HasStatus: true,
+		StatusMap: statusMap,
+	})
 }
 
 // Feature 8: Commit Message Linting
@@ -3062,16 +3077,15 @@ func validateCommitFormat(subject string) []string {
 	return issues
 }
 
+// renderLintingUI displays commit message linting results and issues.
 func renderLintingUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Commit Message Linting ===\n")
+	var errors []string
 	for _, result := range m.lintingResults {
-		sb.WriteString(fmt.Sprintf("%s: score %d\n", result.hash, result.score))
 		for _, issue := range result.issues {
-			sb.WriteString(fmt.Sprintf("  - %s\n", issue))
+			errors = append(errors, fmt.Sprintf("%s: %s", result.hash, issue))
 		}
 	}
-	return sb.String()
+	return RenderErrorList("Commit Message Linting", errors)
 }
 
 // Feature 9: Large Commit Detection
@@ -3110,13 +3124,13 @@ func calculateCommitMetrics(hash string, linesChanged int, filesChanged int) com
 	}
 }
 
+// renderLargeCommitsUI displays large commits and their metrics using the analysis UI template.
 func renderLargeCommitsUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Large Commits ===\n")
+	data := make(map[string]interface{})
 	for _, lc := range m.largeCommits {
-		sb.WriteString(fmt.Sprintf("%s: %d lines, %d files\n", lc.hash, lc.linesChanged, lc.filesChanged))
+		data[lc.hash] = fmt.Sprintf("%d lines, %d files", lc.linesChanged, lc.filesChanged)
 	}
-	return sb.String()
+	return RenderAnalysisUI("Large Commits", data)
 }
 
 // Feature 10: Commit Complexity Analysis
@@ -3148,13 +3162,13 @@ func calculateComplexityScore(metrics commitMetrics) int {
 	return score
 }
 
+// renderComplexityUI displays commit complexity metrics using the analysis UI template.
 func renderComplexityUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Commit Complexity ===\n")
+	data := make(map[string]interface{})
 	for _, cm := range m.commitMetrics {
-		sb.WriteString(fmt.Sprintf("%s: complexity %d\n", cm.hash, cm.complexity))
+		data[cm.hash] = cm.complexity
 	}
-	return sb.String()
+	return RenderAnalysisUI("Commit Complexity", data)
 }
 
 // --- Commit Analysis & Search (4 features) ---
@@ -3175,13 +3189,13 @@ func semanticSearch(commits []commit, query string) []semanticSearchResult {
 	return results
 }
 
+// renderSemanticSearchUI displays semantic search results using the analysis UI template.
 func renderSemanticSearchUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Semantic Search Results ===\n")
+	data := make(map[string]interface{})
 	for _, r := range m.semanticSearchResults {
-		sb.WriteString(fmt.Sprintf("%s: %d%% match\n", r.hash, r.relevance))
+		data[r.hash] = float64(r.relevance) / 100.0
 	}
-	return sb.String()
+	return RenderAnalysisUI("Semantic Search Results", data)
 }
 
 // Feature 2: Author Activity Heatmap
@@ -3214,13 +3228,13 @@ func findPeakHour(data authorActivityData) int {
 	return maxHour
 }
 
+// renderActivityHeatmapUI displays author activity heatmap data using the analysis UI template.
 func renderActivityHeatmapUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Author Activity Heatmap ===\n")
-	for _, data := range m.authorActivityHeatmap {
-		sb.WriteString(fmt.Sprintf("%s: peak at %d:00\n", data.author, data.peakHour))
+	data := make(map[string]interface{})
+	for _, activity := range m.authorActivityHeatmap {
+		data[activity.author] = fmt.Sprintf("peak at %d:00", activity.peakHour)
 	}
-	return sb.String()
+	return RenderAnalysisUI("Author Activity Heatmap", data)
 }
 
 // Feature 3: Merge Analysis
@@ -3240,13 +3254,13 @@ func analyzeMerges(commits []commit) []mergeAnalysis {
 	return analysis
 }
 
+// renderMergeAnalysisUI displays merge analysis data using the analysis UI template.
 func renderMergeAnalysisUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Merge Analysis ===\n")
+	data := make(map[string]interface{})
 	for _, merge := range m.mergeAnalysisData {
-		sb.WriteString(fmt.Sprintf("%s: fast-forward=%v\n", merge.hash, merge.isFastForward))
+		data[merge.hash] = merge.isFastForward
 	}
-	return sb.String()
+	return RenderAnalysisUI("Merge Analysis", data)
 }
 
 // Feature 4: Commit Coupling Analysis
@@ -3287,13 +3301,14 @@ func extractFilesFromSubject(subject string) []string {
 	return files
 }
 
+// renderCouplingAnalysisUI displays commit coupling analysis using the analysis UI template.
 func renderCouplingAnalysisUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Coupling Analysis ===\n")
+	data := make(map[string]interface{})
 	for _, c := range m.commitCouplings {
-		sb.WriteString(fmt.Sprintf("%s <-> %s: %.2f correlation\n", c.file1, c.file2, c.correlation))
+		key := fmt.Sprintf("%s <-> %s", c.file1, c.file2)
+		data[key] = c.correlation
 	}
-	return sb.String()
+	return RenderAnalysisUI("Coupling Analysis", data)
 }
 
 // --- Performance & Filtering (4 features) ---
@@ -3314,17 +3329,24 @@ func toggleExtensionFilter(m model, ext string) model {
 	return m
 }
 
+// renderExtensionFilterUI displays extension filter status using the standard UI template.
 func renderExtensionFilterUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Extension Filters ===\n")
+	var items []string
+	statusMap := make(map[string]string)
 	for _, f := range m.extensionFilters {
-		status := "off"
+		items = append(items, f.extension)
 		if f.enabled {
-			status = "on"
+			statusMap[f.extension] = "on"
+		} else {
+			statusMap[f.extension] = "off"
 		}
-		sb.WriteString(fmt.Sprintf("%s: %s\n", f.extension, status))
 	}
-	return sb.String()
+	return RenderStandardUI(RenderConfig{
+		Title:     "Extension Filters",
+		Items:     items,
+		HasStatus: true,
+		StatusMap: statusMap,
+	})
 }
 
 // Feature 6: Commit Grouping
@@ -3353,13 +3375,13 @@ func groupCommits(commits []commit, groupBy string) []commitGroup {
 	return groups
 }
 
+// renderCommitGroupsUI displays commit groups using the analysis UI template.
 func renderCommitGroupsUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Commit Groups ===\n")
+	data := make(map[string]interface{})
 	for _, g := range m.commitGroups {
-		sb.WriteString(fmt.Sprintf("%s: %d commits\n", g.label, len(g.commits)))
+		data[g.label] = len(g.commits)
 	}
-	return sb.String()
+	return RenderAnalysisUI("Commit Groups", data)
 }
 
 // Feature 7: Fast-Forward Merge Detection
@@ -3374,15 +3396,18 @@ func detectFastForwardMerges(commits []commit) []mergeAnalysis {
 	return ffMerges
 }
 
+// renderFastForwardsUI displays fast-forward merges using the standard UI template.
 func renderFastForwardsUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Fast-Forward Merges ===\n")
+	var items []string
 	for _, merge := range m.mergeAnalysisData {
 		if merge.isFastForward {
-			sb.WriteString(fmt.Sprintf("%s: FF merge\n", merge.hash))
+			items = append(items, merge.hash)
 		}
 	}
-	return sb.String()
+	return RenderStandardUI(RenderConfig{
+		Title: "Fast-Forward Merges",
+		Items: items,
+	})
 }
 
 // Feature 8: Dependency Change Tracking
@@ -3402,13 +3427,13 @@ func trackDependencyChanges(commits []commit) []dependencyChange {
 	return deps
 }
 
+// renderDependenciesUI displays dependency change tracking using the analysis UI template.
 func renderDependenciesUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Dependency Changes ===\n")
+	data := make(map[string]interface{})
 	for _, d := range m.dependencyChanges {
-		sb.WriteString(fmt.Sprintf("%s: %s -> %s\n", d.dep, d.oldVer, d.newVer))
+		data[d.dep] = fmt.Sprintf("%s -> %s", d.oldVer, d.newVer)
 	}
-	return sb.String()
+	return RenderAnalysisUI("Dependency Changes", data)
 }
 
 // --- Advanced Workflows (5 features) ---
@@ -3433,13 +3458,13 @@ func switchWorktree(m model, path string) model {
 	return m
 }
 
+// renderWorktreesUI displays worktree information using the analysis UI template.
 func renderWorktreesUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Worktrees ===\n")
+	data := make(map[string]interface{})
 	for _, wt := range m.worktrees {
-		sb.WriteString(fmt.Sprintf("%s [%s]\n", wt.path, wt.branch))
+		data[wt.path] = wt.branch
 	}
-	return sb.String()
+	return RenderAnalysisUI("Worktrees", data)
 }
 
 // Feature 10: Submodule Tracking
@@ -3458,13 +3483,13 @@ func parseSubmodules(output string) []submoduleInfo {
 	return subs
 }
 
+// renderSubmodulesUI displays submodule information using the analysis UI template.
 func renderSubmodulesUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Submodules ===\n")
+	data := make(map[string]interface{})
 	for _, sm := range m.submodules {
-		sb.WriteString(fmt.Sprintf("%s -> %s\n", sm.path, sm.url))
+		data[sm.path] = sm.url
 	}
-	return sb.String()
+	return RenderAnalysisUI("Submodules", data)
 }
 
 // Feature 11: Named Stashes
@@ -3478,13 +3503,13 @@ func createNamedStash(m model, index int, name string, desc string) model {
 	return m
 }
 
+// renderNamedStashesUI displays named stashes using the analysis UI template.
 func renderNamedStashesUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Named Stashes ===\n")
+	data := make(map[string]interface{})
 	for _, ns := range m.namedStashes {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", ns.name, ns.description))
+		data[ns.name] = ns.description
 	}
-	return sb.String()
+	return RenderAnalysisUI("Named Stashes", data)
 }
 
 // Feature 12: Tag Management
@@ -3498,13 +3523,13 @@ func queueTagOperation(m model, name string, hash string, action string, msg str
 	return m
 }
 
+// renderTagMgmtUI displays tag management operations using the analysis UI template.
 func renderTagMgmtUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Tag Management ===\n")
+	data := make(map[string]interface{})
 	for _, op := range m.pendingTagOps {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", op.name, op.action))
+		data[op.name] = op.action
 	}
-	return sb.String()
+	return RenderAnalysisUI("Tag Management", data)
 }
 
 // Feature 13: GPG Signature Status
@@ -3560,13 +3585,13 @@ func buildContributorFlame(commits []commit) []contributorFlameData {
 	return flame
 }
 
+// renderFlamegraphUI displays contributor flamegraph data using the analysis UI template.
 func renderFlamegraphUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Contributor Flamegraph ===\n")
+	data := make(map[string]interface{})
 	for _, cf := range m.contributorFlameData {
-		sb.WriteString(fmt.Sprintf("%s: %.1f%% (%d commits)\n", cf.author, cf.percentage, cf.commits))
+		data[cf.author] = cf.percentage
 	}
-	return sb.String()
+	return RenderAnalysisUI("Contributor Flamegraph", data)
 }
 
 // Feature 15: Timeline Slider
@@ -3585,13 +3610,13 @@ func buildTimeline(commits []commit) []timelinePoint {
 	return timeline
 }
 
+// renderTimelineSliderUI displays timeline data using the analysis UI template.
 func renderTimelineSliderUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Timeline ===\n")
+	data := make(map[string]interface{})
 	for _, tp := range m.timelinePoints {
-		sb.WriteString(fmt.Sprintf("%s: %d commits\n", tp.date, tp.commits))
+		data[tp.date] = tp.commits
 	}
-	return sb.String()
+	return RenderAnalysisUI("Timeline", data)
 }
 
 // Feature 16: Tree View
@@ -3614,6 +3639,7 @@ func buildTreeView(commits []commit) *treeNode {
 	return root
 }
 
+// renderTreeViewUI displays tree view of commits with hierarchy.
 func renderTreeViewUI(m model, width int) string {
 	var sb strings.Builder
 	sb.WriteString("=== Tree View ===\n")
@@ -3646,13 +3672,17 @@ func compareAuthors(m model) []authorComparison {
 	return comparisons
 }
 
+// renderAuthorComparisonUI displays author comparison using the comparison table template.
 func renderAuthorComparisonUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Author Comparison ===\n")
-	for _, comp := range m.authorComparisons {
-		sb.WriteString(fmt.Sprintf("%s vs %s: %.1f%% similar\n", comp.author1, comp.author2, comp.similarity*100))
+	if len(m.authorComparisons) == 0 {
+		return "=== Author Comparison ===\nNo comparisons available\n"
 	}
-	return sb.String()
+	comp := m.authorComparisons[0]
+	items := map[string][2]interface{}{
+		"Commits": {comp.commits1, comp.commits2},
+		"Similarity": {comp.similarity, 0},
+	}
+	return RenderComparisonTable("Author Comparison", comp.author1, comp.author2, items)
 }
 
 // Feature 18: File Heatmap
@@ -3681,13 +3711,21 @@ func buildFileHeatmap(commits []commit) []fileHeatmapEntry {
 	return heatmap
 }
 
+// renderFileHeatmapUI displays file heatmap with risk levels using the standard UI template.
 func renderFileHeatmapUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== File Heatmap ===\n")
+	var items []string
+	statusMap := make(map[string]string)
 	for _, fh := range m.fileHeatmap {
-		sb.WriteString(fmt.Sprintf("%s: %d changes [%s]\n", fh.path, fh.frequency, fh.risk))
+		item := fmt.Sprintf("%s: %d changes", fh.path, fh.frequency)
+		items = append(items, item)
+		statusMap[item] = fh.risk
 	}
-	return sb.String()
+	return RenderStandardUI(RenderConfig{
+		Title:     "File Heatmap",
+		Items:     items,
+		HasStatus: true,
+		StatusMap: statusMap,
+	})
 }
 
 // --- Integration & Export (5 features) ---
@@ -3712,13 +3750,14 @@ func extractPRReferences(commits []commit) []githubPRReference {
 	return prefs
 }
 
+// renderPRLinksUI displays GitHub PR links using the analysis UI template.
 func renderPRLinksUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== PR Links ===\n")
+	data := make(map[string]interface{})
 	for _, pr := range m.prReferences {
-		sb.WriteString(fmt.Sprintf("PR #%d: %s\n", pr.prNumber, pr.status))
+		key := fmt.Sprintf("PR #%d", pr.prNumber)
+		data[key] = pr.status
 	}
-	return sb.String()
+	return RenderAnalysisUI("PR Links", data)
 }
 
 // Feature 20: JIRA Ticket Linking
@@ -3740,13 +3779,13 @@ func extractJiraTickets(commits []commit) []jiraTicketLink {
 	return tickets
 }
 
+// renderJiraLinksUI displays JIRA ticket links using the analysis UI template.
 func renderJiraLinksUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== JIRA Links ===\n")
+	data := make(map[string]interface{})
 	for _, jira := range m.jiraLinks {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", jira.ticket, jira.status))
+		data[jira.ticket] = jira.status
 	}
-	return sb.String()
+	return RenderAnalysisUI("JIRA Links", data)
 }
 
 // Feature 21: Export to Markdown
@@ -3764,11 +3803,12 @@ func exportToMarkdown(commits []commit) exportData {
 	}
 }
 
+// renderExportUI displays export options using the analysis UI template.
 func renderExportUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Export Options ===\n")
-	sb.WriteString(fmt.Sprintf("Format: %s\n", m.exportFormat))
-	return sb.String()
+	data := map[string]interface{}{
+		"Format": m.exportFormat,
+	}
+	return RenderAnalysisUI("Export Options", data)
 }
 
 // Feature 22: Patch Series Export
@@ -3809,13 +3849,13 @@ func extractIssueReferences(commits []commit) []issueReference {
 	return refs
 }
 
+// renderIssueRefsUI displays issue references using the analysis UI template.
 func renderIssueRefsUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Issue References ===\n")
+	data := make(map[string]interface{})
 	for _, ref := range m.issueReferences {
-		sb.WriteString(fmt.Sprintf("%s: %v\n", ref.hash, ref.references))
+		data[ref.hash] = ref.references
 	}
-	return sb.String()
+	return RenderAnalysisUI("Issue References", data)
 }
 
 // --- Advanced Git Operations (5 features) ---
@@ -3842,17 +3882,24 @@ func detectConflicts(content string) []conflictInfo {
 	return conflicts
 }
 
+// renderConflictUI displays conflict resolution status using the standard UI template.
 func renderConflictUI(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("=== Conflict Resolution ===\n")
+	var items []string
+	statusMap := make(map[string]string)
 	for _, c := range m.conflictList {
-		status := "unresolved"
+		items = append(items, c.file)
 		if c.resolved {
-			status = "resolved"
+			statusMap[c.file] = "resolved"
+		} else {
+			statusMap[c.file] = "unresolved"
 		}
-		sb.WriteString(fmt.Sprintf("%s: %s\n", c.file, status))
 	}
-	return sb.String()
+	return RenderStandardUI(RenderConfig{
+		Title:     "Conflict Resolution",
+		Items:     items,
+		HasStatus: true,
+		StatusMap: statusMap,
+	})
 }
 
 // Feature 3: Squash/Fixup Automation
