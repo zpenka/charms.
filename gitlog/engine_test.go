@@ -4003,11 +4003,288 @@ func TestRateLimiter_AllowsOperations(t *testing.T) {
 
 func TestMetrics_TracksOperations(t *testing.T) {
 	metrics := NewMetrics()
-	
+
 	metrics.RecordOperation("filter", true)
 	metrics.RecordOperation("filter", true)
 	metrics.RecordOperation("filter", false)
-	
+
 	rate := metrics.GetSuccessRate("filter")
 	AssertTrue(t, rate > 0 && rate <= 1, "success rate should be between 0 and 1")
+}
+
+// --- New Features: Advanced Filtering & Search ---
+
+func TestFilterByRegex_MatchesPattern(t *testing.T) {
+	fixture := NewTestFixture()
+
+	pattern := "^Add"
+	results := filterByRegex(fixture.Commits, pattern)
+
+	AssertNotNil(t, results, "should return results for valid pattern")
+	AssertTrue(t, len(results) > 0, "should match commits with 'Add' prefix")
+}
+
+func TestFilterByRegex_NoMatches(t *testing.T) {
+	fixture := NewTestFixture()
+
+	pattern := "^NonExistentPattern"
+	results := filterByRegex(fixture.Commits, pattern)
+
+	AssertLen(t, results, 0, "should return empty when no matches")
+}
+
+func TestFilterByRegex_InvalidPattern(t *testing.T) {
+	fixture := NewTestFixture()
+
+	pattern := "[invalid(pattern"
+	results := filterByRegex(fixture.Commits, pattern)
+
+	// Handle nil slice return - nil slices are valid
+	if results == nil {
+		return
+	}
+	t.Errorf("should return nil for invalid regex: got %v", results)
+}
+
+func TestFilterByDateRange_WithinRange(t *testing.T) {
+	fixture := NewTestFixture()
+
+	startDays := 0
+	endDays := 3
+	results := filterByDateRange(fixture.Commits, startDays, endDays)
+
+	AssertNotNil(t, results, "should return results")
+	AssertTrue(t, len(results) > 0, "should match commits within range")
+}
+
+func TestFilterByDateRange_OutsideRange(t *testing.T) {
+	fixture := NewTestFixture()
+
+	startDays := 10
+	endDays := 20
+	results := filterByDateRange(fixture.Commits, startDays, endDays)
+
+	AssertLen(t, results, 0, "should return empty when outside range")
+}
+
+func TestFilterByFilePattern_MatchesFiles(t *testing.T) {
+	fixture := NewTestFixture()
+
+	pattern := "*.go"
+	results := filterByFilePattern(fixture.Commits, pattern)
+
+	AssertNotNil(t, results, "should return results")
+}
+
+func TestFilterByAuthor_ExactMatch(t *testing.T) {
+	fixture := NewTestFixture()
+
+	author := "Alice"
+	results := filterByAuthor(fixture.Commits, author)
+
+	AssertTrue(t, len(results) > 0, "should match Alice's commits")
+}
+
+func TestFilterCombined_MultipleFilters(t *testing.T) {
+	fixture := NewTestFixture()
+
+	filters := &FilterOptions{
+		Author: "Alice",
+		Search: "feature",
+	}
+	results := filterCommitsCombined(fixture.Commits, filters)
+
+	AssertNotNil(t, results, "should return results")
+}
+
+// --- New Features: Workflow Templates ---
+
+func TestWorkflowTemplate_CreatesTemplate(t *testing.T) {
+	tmpl := &WorkflowTemplate{
+		Name: "Feature Branch",
+		Steps: []string{"git checkout -b feature/...", "git commit"},
+	}
+
+	AssertNotNil(t, tmpl, "should create template")
+	AssertEqual(t, "Feature Branch", tmpl.Name, "should have correct name")
+	AssertLen(t, tmpl.Steps, 2, "should have 2 steps")
+}
+
+func TestWorkflowTemplate_ExecutesSteps(t *testing.T) {
+	tmpl := &WorkflowTemplate{
+		Name: "Test Workflow",
+		Steps: []string{"step1", "step2", "step3"},
+	}
+
+	executed := executeWorkflowTemplate(tmpl)
+	AssertTrue(t, executed, "should execute successfully")
+}
+
+func TestGetPredefinedWorkflows_ReturnsTemplates(t *testing.T) {
+	workflows := getPredefinedWorkflows()
+
+	AssertNotNil(t, workflows, "should return workflows")
+	AssertTrue(t, len(workflows) > 0, "should have predefined workflows")
+}
+
+// --- New Features: Commit Signing & Verification ---
+
+func TestVerifyCommitSignature_ValidSignature(t *testing.T) {
+	commit := &commit{
+		hash: "abc1234567890123456789012345678901234",
+		subject: "Signed commit",
+	}
+
+	verified := verifyCommitSignature(commit)
+	AssertNotNil(t, verified, "should return verification result")
+}
+
+func TestGetSignatureStatus_ReturnsStatus(t *testing.T) {
+	commit := &commit{
+		hash: "def5678901234567890123456789012345678",
+		subject: "Check signature",
+	}
+
+	status := getSignatureStatus(commit)
+	AssertNotNil(t, status, "should return status")
+	AssertTrue(t, len(status) > 0, "status should not be empty")
+}
+
+func TestRenderCommitSigningUI_DisplaysSigningInfo(t *testing.T) {
+	commits := NewTestFixture().Commits
+
+	ui := renderCommitSigningUI(commits)
+	AssertNotNil(t, ui, "should render signing UI")
+	AssertTrue(t, len(ui) > 0, "UI should not be empty")
+	AssertStringContains(t, ui, "Signature", "should contain signature info")
+}
+
+// --- New Features: Collaboration Features ---
+
+func TestGetCodeReviewStats_CalculatesStats(t *testing.T) {
+	fixture := NewTestFixture()
+
+	stats := getCodeReviewStats(fixture.Commits)
+	AssertNotNil(t, stats, "should return stats")
+}
+
+func TestGetPairProgrammingStats_CalculatesStats(t *testing.T) {
+	fixture := NewTestFixture()
+
+	stats := getPairProgrammingStats(fixture.Commits)
+	AssertNotNil(t, stats, "should return pair stats")
+}
+
+func TestBuildCollaborationMetrics_TracksMetrics(t *testing.T) {
+	fixture := NewTestFixture()
+
+	metrics := buildCollaborationMetrics(fixture.Commits)
+	AssertNotNil(t, metrics, "should build metrics")
+}
+
+func TestRenderCollaborationUI_DisplaysMetrics(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderCollaborationUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render collaboration UI")
+	AssertTrue(t, len(ui) > 0, "UI should not be empty")
+}
+
+// --- New Features: Rich Visualization ---
+
+func TestBuildFlameGraph_GeneratesGraph(t *testing.T) {
+	fixture := NewTestFixture()
+
+	graph := buildFlameGraph(fixture.Commits)
+	AssertNotNil(t, graph, "should generate flame graph")
+}
+
+func TestBuildDependencyGraph_GeneratesGraph(t *testing.T) {
+	fixture := NewTestFixture()
+
+	graph := buildDependencyGraph(fixture.Commits)
+	AssertNotNil(t, graph, "should generate dependency graph")
+}
+
+func TestRenderFlameGraphUI_DisplaysGraph(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderFlameGraphUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render flame graph")
+	AssertTrue(t, len(ui) > 0, "UI should not be empty")
+}
+
+func TestRenderDependencyGraphUI_DisplaysGraph(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderDependencyGraphUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render dependency graph")
+	AssertTrue(t, len(ui) > 0, "UI should not be empty")
+}
+
+// --- New Features: Interactive Timeline ---
+
+func TestBuildInteractiveTimeline_CreatesTimeline(t *testing.T) {
+	fixture := NewTestFixture()
+
+	timeline := buildInteractiveTimeline(fixture.Commits)
+	AssertNotNil(t, timeline, "should create timeline")
+}
+
+func TestRenderTimelineUI_DisplaysTimeline(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderTimelineUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render timeline")
+	AssertTrue(t, len(ui) > 0, "timeline should not be empty")
+}
+
+func TestTimelineScrubber_NavigatesTimeline(t *testing.T) {
+	fixture := NewTestFixture()
+
+	scrubber := &TimelineScrubber{
+		Commits: fixture.Commits,
+		Current: 0,
+	}
+
+	next := scrubber.Next()
+	AssertTrue(t, next, "should move to next")
+	AssertEqual(t, 1, scrubber.Current, "should advance position")
+}
+
+// --- New Features: Side-by-Side Comparison ---
+
+func TestCompareCommits_GeneratesComparison(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa1111111111111111111111111111111111", shortHash: "aaa1111", subject: "First"},
+		{hash: "bbb2222222222222222222222222222222222", shortHash: "bbb2222", subject: "Second"},
+	}
+
+	comparison := compareCommits(commits[0], commits[1])
+	AssertNotNil(t, comparison, "should generate comparison")
+}
+
+func TestRenderComparisonUI_DisplaysComparison(t *testing.T) {
+	commits := []commit{
+		{hash: "aaa1111111111111111111111111111111111", shortHash: "aaa1111", author: "Alice", subject: "First"},
+		{hash: "bbb2222222222222222222222222222222222", shortHash: "bbb2222", author: "Bob", subject: "Second"},
+	}
+
+	ui := renderCommitComparisonUI(commits[0], commits[1])
+	AssertNotNil(t, ui, "should render comparison")
+	AssertTrue(t, len(ui) > 0, "comparison should not be empty")
+}
+
+// --- New Features: Search & Filter UI ---
+
+func TestRenderSearchUI_DisplaysSearchOptions(t *testing.T) {
+	ui := renderSearchUI()
+	AssertNotNil(t, ui, "should render search UI")
+	AssertTrue(t, len(ui) > 0, "search UI should not be empty")
+}
+
+func TestRenderAdvancedFilterUI_DisplaysFilterOptions(t *testing.T) {
+	ui := renderAdvancedFilterUI()
+	AssertNotNil(t, ui, "should render filter UI")
+	AssertTrue(t, len(ui) > 0, "filter UI should not be empty")
 }

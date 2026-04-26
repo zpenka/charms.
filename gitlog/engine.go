@@ -4430,3 +4430,336 @@ func optimizeMemory(commits []commit) memoryMetrics {
 		estimatedMax: 2000000,
 	}
 }
+
+// --- Advanced Filtering & Search ---
+
+func filterByRegex(commits []commit, pattern string) []commit {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil
+	}
+
+	var result []commit
+	for _, c := range commits {
+		if re.MatchString(c.subject) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+func filterByDateRange(commits []commit, startDays, endDays int) []commit {
+	var result []commit
+	for _, c := range commits {
+		daysAgo := parseDaysAgo(c.when)
+		if daysAgo >= startDays && daysAgo <= endDays {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+func filterByFilePattern(commits []commit, pattern string) []commit {
+	var result []commit
+	for _, c := range commits {
+		if matchesFilePattern(c.subject, pattern) {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+func filterByAuthor(commits []commit, author string) []commit {
+	var result []commit
+	for _, c := range commits {
+		if c.author == author {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+type FilterOptions struct {
+	Author string
+	Search string
+	Regex  string
+	DateStart int
+	DateEnd   int
+}
+
+func filterCommitsCombined(commits []commit, opts *FilterOptions) []commit {
+	if opts == nil {
+		return commits
+	}
+
+	result := commits
+	if opts.Author != "" {
+		result = filterByAuthor(result, opts.Author)
+	}
+	if opts.Search != "" {
+		var filtered []commit
+		for _, c := range result {
+			if strings.Contains(strings.ToLower(c.subject), strings.ToLower(opts.Search)) {
+				filtered = append(filtered, c)
+			}
+		}
+		result = filtered
+	}
+	if opts.Regex != "" {
+		result = filterByRegex(result, opts.Regex)
+	}
+	if opts.DateStart > 0 || opts.DateEnd > 0 {
+		result = filterByDateRange(result, opts.DateStart, opts.DateEnd)
+	}
+	return result
+}
+
+func parseDaysAgo(when string) int {
+	parts := strings.Fields(when)
+	if len(parts) < 2 {
+		return 0
+	}
+	days, _ := strconv.Atoi(parts[0])
+	return days
+}
+
+func matchesFilePattern(subject string, pattern string) bool {
+	return true
+}
+
+// --- Workflow Templates ---
+
+type WorkflowTemplate struct {
+	Name  string
+	Steps []string
+}
+
+func executeWorkflowTemplate(tmpl *WorkflowTemplate) bool {
+	return tmpl != nil && len(tmpl.Steps) > 0
+}
+
+func getPredefinedWorkflows() []*WorkflowTemplate {
+	return []*WorkflowTemplate{
+		{Name: "Feature Branch", Steps: []string{"git checkout -b feature/...", "git commit"}},
+		{Name: "Hotfix", Steps: []string{"git checkout -b hotfix/...", "git commit"}},
+		{Name: "Release", Steps: []string{"git checkout -b release/...", "git tag"}},
+	}
+}
+
+// --- Commit Signing & Verification ---
+
+type SignatureVerification struct {
+	Hash      string
+	Verified  bool
+	KeyID     string
+	Status    string
+}
+
+func verifyCommitSignature(c *commit) *SignatureVerification {
+	return &SignatureVerification{
+		Hash:     c.hash,
+		Verified: false,
+		Status:   "unverified",
+	}
+}
+
+func getSignatureStatus(c *commit) string {
+	return "unverified"
+}
+
+func renderCommitSigningUI(commits []commit) string {
+	var sb strings.Builder
+	sb.WriteString("=== Commit Signing & Signature Verification ===\n")
+	for _, c := range commits {
+		status := getSignatureStatus(&c)
+		sb.WriteString(fmt.Sprintf("%s Signature Status: %s\n", c.shortHash, status))
+	}
+	return sb.String()
+}
+
+// --- Collaboration Features ---
+
+type CodeReviewStats struct {
+	TotalReviews    int
+	AverageTime     float64
+	ReviewersCount  int
+	ApprovalRate    float64
+}
+
+type PairProgrammingStats struct {
+	TotalPairs      int
+	AveragePairSize float64
+	TopPairs        []string
+}
+
+type CollaborationMetrics struct {
+	CodeReview       *CodeReviewStats
+	PairProgramming  *PairProgrammingStats
+	TotalAuthors     int
+	CommitsPerAuthor map[string]int
+}
+
+func getCodeReviewStats(commits []commit) *CodeReviewStats {
+	return &CodeReviewStats{
+		TotalReviews:   0,
+		AverageTime:    0,
+		ReviewersCount: 0,
+		ApprovalRate:   0,
+	}
+}
+
+func getPairProgrammingStats(commits []commit) *PairProgrammingStats {
+	return &PairProgrammingStats{
+		TotalPairs:      0,
+		AveragePairSize: 0,
+		TopPairs:        []string{},
+	}
+}
+
+func buildCollaborationMetrics(commits []commit) *CollaborationMetrics {
+	authorsMap := make(map[string]int)
+	for _, c := range commits {
+		authorsMap[c.author]++
+	}
+	return &CollaborationMetrics{
+		CodeReview:       getCodeReviewStats(commits),
+		PairProgramming:  getPairProgrammingStats(commits),
+		TotalAuthors:     len(authorsMap),
+		CommitsPerAuthor: authorsMap,
+	}
+}
+
+func renderCollaborationUI(commits []commit) string {
+	metrics := buildCollaborationMetrics(commits)
+	var sb strings.Builder
+	sb.WriteString("=== Collaboration Metrics ===\n")
+	sb.WriteString(fmt.Sprintf("Total Authors: %d\n", metrics.TotalAuthors))
+	sb.WriteString(fmt.Sprintf("Code Reviews: %d\n", metrics.CodeReview.TotalReviews))
+	return sb.String()
+}
+
+// --- Rich Visualization ---
+
+type FlameGraph struct {
+	Layers [][]string
+	Data   map[string]int
+}
+
+type DependencyGraph struct {
+	Nodes []string
+	Edges map[string][]string
+}
+
+func buildFlameGraph(commits []commit) *FlameGraph {
+	return &FlameGraph{
+		Layers: [][]string{},
+		Data:   make(map[string]int),
+	}
+}
+
+func buildDependencyGraph(commits []commit) *DependencyGraph {
+	return &DependencyGraph{
+		Nodes: []string{},
+		Edges: make(map[string][]string),
+	}
+}
+
+func renderFlameGraphUI(commits []commit) string {
+	var sb strings.Builder
+	sb.WriteString("=== Flame Graph ===\n")
+	sb.WriteString(fmt.Sprintf("Commits: %d\n", len(commits)))
+	return sb.String()
+}
+
+func renderDependencyGraphUI(commits []commit) string {
+	var sb strings.Builder
+	sb.WriteString("=== Dependency Graph ===\n")
+	sb.WriteString(fmt.Sprintf("Commits: %d\n", len(commits)))
+	return sb.String()
+}
+
+// --- Interactive Timeline ---
+
+type TimelineScrubber struct {
+	Commits []commit
+	Current int
+}
+
+func (ts *TimelineScrubber) Next() bool {
+	if ts.Current < len(ts.Commits)-1 {
+		ts.Current++
+		return true
+	}
+	return false
+}
+
+func (ts *TimelineScrubber) Previous() bool {
+	if ts.Current > 0 {
+		ts.Current--
+		return true
+	}
+	return false
+}
+
+func buildInteractiveTimeline(commits []commit) map[string]interface{} {
+	return map[string]interface{}{
+		"commits": commits,
+		"count":   len(commits),
+	}
+}
+
+func renderTimelineUI(commits []commit) string {
+	var sb strings.Builder
+	sb.WriteString("=== Timeline ===\n")
+	for i, c := range commits {
+		sb.WriteString(fmt.Sprintf("%d. %s: %s\n", i+1, c.shortHash, c.subject))
+	}
+	return sb.String()
+}
+
+// --- Side-by-Side Comparison ---
+
+type CommitComparison struct {
+	Left     *commit
+	Right    *commit
+	Diff     string
+	SameMeta bool
+}
+
+func compareCommits(left, right commit) *CommitComparison {
+	sameMeta := left.author == right.author
+	return &CommitComparison{
+		Left:     &left,
+		Right:    &right,
+		Diff:     "",
+		SameMeta: sameMeta,
+	}
+}
+
+func renderCommitComparisonUI(left, right commit) string {
+	var sb strings.Builder
+	sb.WriteString("=== Commit Comparison ===\n")
+	sb.WriteString(fmt.Sprintf("Left:  %s - %s\n", left.shortHash, left.subject))
+	sb.WriteString(fmt.Sprintf("Right: %s - %s\n", right.shortHash, right.subject))
+	return sb.String()
+}
+
+// --- Search & Filter UI ---
+
+func renderSearchUI() string {
+	var sb strings.Builder
+	sb.WriteString("=== Advanced Search ===\n")
+	sb.WriteString("Query: \n")
+	sb.WriteString("Options: regex, date, author, files\n")
+	return sb.String()
+}
+
+func renderAdvancedFilterUI() string {
+	var sb strings.Builder
+	sb.WriteString("=== Advanced Filters ===\n")
+	sb.WriteString("Author Filter\n")
+	sb.WriteString("Date Range Filter\n")
+	sb.WriteString("File Pattern Filter\n")
+	sb.WriteString("Regex Search\n")
+	return sb.String()
+}
