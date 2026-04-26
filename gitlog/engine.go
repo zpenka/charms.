@@ -2043,31 +2043,33 @@ func parseReflog(output string) []reflogEntry {
 }
 
 // renderStashView renders the stash browser view.
+// renderStashView renders the stash list using consolidated rendering.
 func renderStashView(stashes []stashEntry, width int) string {
-	var sb strings.Builder
-	sb.WriteString("Stashes:\n")
-	if len(stashes) == 0 {
-		sb.WriteString("(no stashes)\n")
-		return sb.String()
+	var items []string
+	for _, s := range stashes {
+		items = append(items, fmt.Sprintf("%s - %s", s.name, s.branch))
 	}
-	for i, s := range stashes {
-		sb.WriteString(fmt.Sprintf("%d: %s - %s\n", i, s.name, s.branch))
+
+	config := RenderConfig{
+		Title:       "Stashes",
+		Items:       items,
+		ShowIndices: true,
 	}
-	return sb.String()
+	return RenderStandardUI(config)
 }
 
-// renderReflogView renders the reflog browser view.
+// renderReflogView renders the reflog browser view using consolidated rendering.
 func renderReflogView(entries []reflogEntry, width int) string {
-	var sb strings.Builder
-	sb.WriteString("Reflog:\n")
-	if len(entries) == 0 {
-		sb.WriteString("(no reflog entries)\n")
-		return sb.String()
-	}
+	var items []string
 	for _, e := range entries {
-		sb.WriteString(fmt.Sprintf("%s - %s: %s\n", e.hash[:7], e.action, e.message))
+		items = append(items, fmt.Sprintf("%s - %s: %s", e.hash[:7], e.action, e.message))
 	}
-	return sb.String()
+
+	config := RenderConfig{
+		Title: "Reflog",
+		Items: items,
+	}
+	return RenderStandardUI(config)
 }
 
 // stashToCommitLike converts a stash entry to a commit-like structure.
