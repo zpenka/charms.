@@ -195,32 +195,39 @@ func (rl *RateLimiter) Allow() bool {
 	return false
 }
 
-// Metrics provides general performance metrics
+// Metrics provides general performance metrics tracking operations by name
 type Metrics struct {
-	Operations   int
-	SuccessFails int
-	Errors       int
-	TotalTime    int64
-	AvgTime      int64
+	Operations map[string]int    // operation name -> count
+	Successes  map[string]int    // operation name -> success count
+	Failures   map[string]int    // operation name -> failure count
+	TotalTime  map[string]int64  // operation name -> total duration
 }
 
-// RecordOperation updates metrics
-func (m *Metrics) RecordOperation(duration int64, success bool) {
-	m.Operations++
-	m.TotalTime += duration
-	m.AvgTime = m.TotalTime / int64(m.Operations)
-
-	if success {
-		m.SuccessFails++
-	} else {
-		m.Errors++
+// NewMetrics creates a new metrics tracker
+func NewMetrics() *Metrics {
+	return &Metrics{
+		Operations: make(map[string]int),
+		Successes:  make(map[string]int),
+		Failures:   make(map[string]int),
+		TotalTime:  make(map[string]int64),
 	}
 }
 
-// GetSuccessRate returns success percentage
-func (m *Metrics) GetSuccessRate() float64 {
-	if m.Operations == 0 {
+// RecordOperation records an operation result
+func (m *Metrics) RecordOperation(name string, success bool) {
+	m.Operations[name]++
+	if success {
+		m.Successes[name]++
+	} else {
+		m.Failures[name]++
+	}
+}
+
+// GetSuccessRate returns success rate for an operation (0.0 to 1.0)
+func (m *Metrics) GetSuccessRate(name string) float64 {
+	total := m.Operations[name]
+	if total == 0 {
 		return 0
 	}
-	return float64(m.SuccessFails) / float64(m.Operations) * 100
+	return float64(m.Successes[name]) / float64(total)
 }

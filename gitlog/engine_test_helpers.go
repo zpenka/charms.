@@ -87,6 +87,10 @@ func AssertLen(t *testing.T, items interface{}, expectedLen int, message string)
 		if len(v) != expectedLen {
 			t.Errorf("%s: expected length %d, got %d", message, expectedLen, len(v))
 		}
+	case []interface{}:
+		if len(v) != expectedLen {
+			t.Errorf("%s: expected length %d, got %d", message, expectedLen, len(v))
+		}
 	default:
 		t.Errorf("%s: unsupported type for length check", message)
 	}

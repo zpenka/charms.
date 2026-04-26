@@ -887,6 +887,35 @@ func parseDiff(raw string) []diffLine {
 	return lines
 }
 
+// processDiffBatch processes diff lines using batch processing for efficiency.
+func processDiffBatch(processor *BatchProcessor, lines []diffLine) []diffLine {
+	var results []diffLine
+
+	for _, line := range lines {
+		processor.Add(line)
+
+		// Process batch when full
+		if processor.IsFull() {
+			batch := processor.Get()
+			for _, item := range batch {
+				if dl, ok := item.(diffLine); ok {
+					results = append(results, dl)
+				}
+			}
+		}
+	}
+
+	// Process remaining items
+	remaining := processor.Get()
+	for _, item := range remaining {
+		if dl, ok := item.(diffLine); ok {
+			results = append(results, dl)
+		}
+	}
+
+	return results
+}
+
 // truncate cuts s to at most max visible runes, appending "…" if shortened.
 // truncate shortens a string to max runes and appends "…" if truncated.
 func truncate(s string, max int) string {

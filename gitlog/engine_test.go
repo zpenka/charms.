@@ -3938,3 +3938,76 @@ func TestFilterCommitsWithCache_CachesResults(t *testing.T) {
 	AssertLen(t, result3, 1, "should find user commit")
 	AssertEqual(t, 1, cache.metrics.Hits, "hits should still be 1")
 }
+
+// --- Optimization: BatchProcessor Pattern ---
+
+func TestBatchProcessDiffs_ProcessesInBatches(t *testing.T) {
+	lines := makeDiffLines(25)
+	processor := NewBatchProcessor(10, 1000)
+	
+	results := processDiffBatch(processor, lines)
+	AssertTrue(t, len(results) > 0, "should process batches")
+	AssertTrue(t, len(results) <= 25, "results should not exceed input")
+}
+
+func TestBatchProcessor_IsFull(t *testing.T) {
+	processor := NewBatchProcessor(3, 1000)
+	
+	processor.Add("item1")
+	AssertFalse(t, processor.IsFull(), "batch should not be full with 1 item")
+	
+	processor.Add("item2")
+	processor.Add("item3")
+	AssertTrue(t, processor.IsFull(), "batch should be full with 3 items")
+}
+
+// --- Optimization: CircularBuffer Pattern ---
+
+func TestCircularBuffer_StoresAndRetrievesItems(t *testing.T) {
+	buffer := NewCircularBuffer(5)
+	
+	buffer.Push("commit1")
+	buffer.Push("commit2")
+	buffer.Push("commit3")
+	
+	items := buffer.GetAll()
+	AssertLen(t, items, 3, "should store 3 items")
+	AssertEqual(t, 3, buffer.Size(), "size should be 3")
+}
+
+func TestCircularBuffer_Wraps(t *testing.T) {
+	buffer := NewCircularBuffer(3)
+	
+	buffer.Push("a")
+	buffer.Push("b")
+	buffer.Push("c")
+	buffer.Push("d") // Should wrap and overwrite "a"
+	
+	items := buffer.GetAll()
+	AssertLen(t, items, 3, "should maintain max capacity")
+}
+
+// --- Optimization: RateLimiter Pattern ---
+
+func TestRateLimiter_AllowsOperations(t *testing.T) {
+	limiter := NewRateLimiter(100) // 100 ops per second
+	
+	allowed := limiter.Allow()
+	AssertTrue(t, allowed, "should allow first operation")
+	
+	allowed = limiter.Allow()
+	AssertTrue(t, allowed, "should allow second operation")
+}
+
+// --- Optimization: Metrics Pattern ---
+
+func TestMetrics_TracksOperations(t *testing.T) {
+	metrics := NewMetrics()
+	
+	metrics.RecordOperation("filter", true)
+	metrics.RecordOperation("filter", true)
+	metrics.RecordOperation("filter", false)
+	
+	rate := metrics.GetSuccessRate("filter")
+	AssertTrue(t, rate > 0 && rate <= 1, "success rate should be between 0 and 1")
+}
