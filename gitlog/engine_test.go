@@ -336,21 +336,11 @@ func TestParseFileItems_Multiple(t *testing.T) {
 		{lineAdded, "+new"},
 	}
 	items := parseFileItems(lines)
-	if len(items) != 2 {
-		t.Fatalf("expected 2, got %d", len(items))
-	}
-	if items[0].path != "a.go" {
-		t.Errorf("first path: got %q", items[0].path)
-	}
-	if items[0].diffIdx != 0 {
-		t.Errorf("first diffIdx: got %d", items[0].diffIdx)
-	}
-	if items[1].path != "path/to/b.go" {
-		t.Errorf("second path: got %q", items[1].path)
-	}
-	if items[1].diffIdx != 2 {
-		t.Errorf("second diffIdx: got %d", items[1].diffIdx)
-	}
+	AssertLen(t, items, 2, "should parse 2 files")
+	AssertEqual(t, "a.go", items[0].path, "first path should match")
+	AssertEqual(t, 0, items[0].diffIdx, "first diffIdx should be 0")
+	AssertEqual(t, "path/to/b.go", items[1].path, "second path should match")
+	AssertEqual(t, 2, items[1].diffIdx, "second diffIdx should be 2")
 }
 
 func TestParseFileItems_SkipsNonDiffGit(t *testing.T) {
@@ -360,9 +350,7 @@ func TestParseFileItems_SkipsNonDiffGit(t *testing.T) {
 		{lineMeta, "diff --git a/bar.go b/bar.go"},
 	}
 	items := parseFileItems(lines)
-	if len(items) != 1 {
-		t.Fatalf("expected 1 (only diff --git lines), got %d", len(items))
-	}
+	AssertLen(t, items, 1, "should only parse diff --git lines")
 }
 
 // --- filterCommits ---
@@ -376,70 +364,55 @@ func makeNamedCommits() []commit {
 }
 
 func TestFilterCommits_EmptyQuery(t *testing.T) {
-	commits := makeNamedCommits()
-	result := filterCommits(commits, "")
-	if len(result) != 3 {
-		t.Errorf("empty query should return all, got %d", len(result))
-	}
+	result := filterCommits(makeNamedCommits(), "")
+	AssertLen(t, result, 3, "empty query should return all")
 }
 
 func TestFilterCommits_BySubject(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "login")
-	if len(result) != 1 || result[0].subject != "Fix login bug" {
-		t.Errorf("expected Fix login bug, got %v", result)
-	}
+	AssertLen(t, result, 1, "should find login commit")
+	AssertEqual(t, "Fix login bug", result[0].subject, "subject should match")
 }
 
 func TestFilterCommits_ByAuthor(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "Jane")
-	if len(result) != 1 || result[0].author != "Jane Smith" {
-		t.Errorf("expected Jane Smith commit, got %v", result)
-	}
+	AssertLen(t, result, 1, "should find Jane's commit")
+	AssertEqual(t, "Jane Smith", result[0].author, "author should match")
 }
 
 func TestFilterCommits_ByHash(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "bbb")
-	if len(result) != 1 || result[0].shortHash != "bbb2222" {
-		t.Errorf("expected bbb2222, got %v", result)
-	}
+	AssertLen(t, result, 1, "should find by hash")
+	AssertEqual(t, "bbb2222", result[0].shortHash, "hash should match")
 }
 
 func TestFilterCommits_CaseInsensitive(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "LOGIN")
-	if len(result) != 1 {
-		t.Errorf("filter should be case-insensitive, got %d", len(result))
-	}
+	AssertLen(t, result, 1, "filter should be case-insensitive")
 }
 
 func TestFilterCommits_NoMatch(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "zzznomatch")
-	if len(result) != 0 {
-		t.Errorf("expected 0 results, got %d", len(result))
-	}
+	AssertLen(t, result, 0, "should return no matches")
 }
 
 func TestFilterCommits_MultipleMatches(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "John")
-	if len(result) != 2 {
-		t.Errorf("expected 2 John Doe commits, got %d", len(result))
-	}
+	AssertLen(t, result, 2, "should find multiple John commits")
 }
 
 // --- visibleCommits ---
 
 func TestVisibleCommits_NoQuery(t *testing.T) {
 	m := model{commits: makeCommits(5)}
-	if len(visibleCommits(m)) != 5 {
-		t.Error("no query should return all commits")
-	}
+	AssertLen(t, visibleCommits(m), 5, "no query should return all commits")
 }
 
 func TestVisibleCommits_WithQuery(t *testing.T) {
 	m := model{commits: makeNamedCommits(), query: "login"}
 	vc := visibleCommits(m)
-	if len(vc) != 1 || vc[0].subject != "Fix login bug" {
-		t.Errorf("unexpected result: %v", vc)
-	}
+	AssertLen(t, vc, 1, "should find login commit")
+	AssertEqual(t, "Fix login bug", vc[0].subject, "subject should match")
 }
 
 // --- scrollToDiffLine ---
@@ -447,28 +420,21 @@ func TestVisibleCommits_WithQuery(t *testing.T) {
 func TestScrollToDiffLine(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
 	m = scrollToDiffLine(m, 10)
-	if m.diffOffset != 10 {
-		t.Errorf("expected 10, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 10, m.diffOffset, "should scroll to line")
 }
 
 func TestScrollToDiffLine_ClampsToMax(t *testing.T) {
-	// height=30 → panelH=23, max=50-23=27
 	m := model{diffLines: makeDiffLines(50), height: 30}
 	m = scrollToDiffLine(m, 1000)
 	panelH := diffPanelHeight(m)
 	expected := len(m.diffLines) - panelH
-	if m.diffOffset != expected {
-		t.Errorf("expected %d, got %d", expected, m.diffOffset)
-	}
+	AssertEqual(t, expected, m.diffOffset, "should clamp to max")
 }
 
 func TestScrollToDiffLine_ClampsToZero(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), height: 30}
 	m = scrollToDiffLine(m, -5)
-	if m.diffOffset != 0 {
-		t.Errorf("expected 0, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 0, m.diffOffset, "should clamp to zero")
 }
 
 // --- toggleFileView ---
@@ -476,20 +442,14 @@ func TestScrollToDiffLine_ClampsToZero(t *testing.T) {
 func TestToggleFileView_Show(t *testing.T) {
 	m := model{showFiles: false}
 	m = toggleFileView(m)
-	if !m.showFiles {
-		t.Error("expected showFiles=true")
-	}
+	AssertTrue(t, m.showFiles, "should show files")
 }
 
 func TestToggleFileView_Hide(t *testing.T) {
 	m := model{showFiles: true, fileCursor: 3}
 	m = toggleFileView(m)
-	if m.showFiles {
-		t.Error("expected showFiles=false")
-	}
-	if m.fileCursor != 0 {
-		t.Error("expected fileCursor reset to 0 on hide")
-	}
+	AssertFalse(t, m.showFiles, "should hide files")
+	AssertEqual(t, 0, m.fileCursor, "cursor should reset on hide")
 }
 
 // --- parseBranches ---
@@ -497,15 +457,9 @@ func TestToggleFileView_Hide(t *testing.T) {
 func TestParseBranches_Simple(t *testing.T) {
 	input := "  main\n* develop\n  remotes/origin/main\n"
 	branches := parseBranches(input)
-	if len(branches) != 3 {
-		t.Fatalf("expected 3, got %d: %v", len(branches), branches)
-	}
-	if branches[0] != "main" {
-		t.Errorf("first: got %q", branches[0])
-	}
-	if branches[1] != "develop" {
-		t.Errorf("second: got %q", branches[1])
-	}
+	AssertLen(t, branches, 3, "should parse 3 branches")
+	AssertEqual(t, "main", branches[0], "first branch should be main")
+	AssertEqual(t, "develop", branches[1], "second branch should be develop")
 }
 
 func TestParseBranches_Empty(t *testing.T) {
@@ -920,12 +874,9 @@ func TestNavigationHistory_CannotGoForwardAtEnd(t *testing.T) {
 
 func TestCommitStats_Empty(t *testing.T) {
 	stats := commitStats([]diffLine{})
-	if stats.filesChanged != 0 {
-		t.Errorf("empty diff should have 0 files, got %d", stats.filesChanged)
-	}
-	if stats.insertions != 0 || stats.deletions != 0 {
-		t.Errorf("empty diff should have 0 changes")
-	}
+	AssertEqual(t, 0, stats.filesChanged, "empty diff should have 0 files")
+	AssertEqual(t, 0, stats.insertions, "empty diff should have 0 insertions")
+	AssertEqual(t, 0, stats.deletions, "empty diff should have 0 deletions")
 }
 
 func TestCommitStats_CountsFiles(t *testing.T) {
@@ -936,9 +887,7 @@ func TestCommitStats_CountsFiles(t *testing.T) {
 		{lineRemoved, "-line"},
 	}
 	stats := commitStats(lines)
-	if stats.filesChanged != 2 {
-		t.Errorf("expected 2 files, got %d", stats.filesChanged)
-	}
+	AssertEqual(t, 2, stats.filesChanged, "should count 2 files")
 }
 
 func TestCommitStats_CountsInsertionsAndDeletions(t *testing.T) {
@@ -951,12 +900,8 @@ func TestCommitStats_CountsInsertionsAndDeletions(t *testing.T) {
 		{lineContext, " context"},
 	}
 	stats := commitStats(lines)
-	if stats.insertions != 2 {
-		t.Errorf("expected 2 insertions, got %d", stats.insertions)
-	}
-	if stats.deletions != 3 {
-		t.Errorf("expected 3 deletions, got %d", stats.deletions)
-	}
+	AssertEqual(t, 2, stats.insertions, "should count 2 insertions")
+	AssertEqual(t, 3, stats.deletions, "should count 3 deletions")
 }
 
 // --- generateCommitMessage ---
@@ -1013,18 +958,14 @@ func TestBookmarks_InitEmpty(t *testing.T) {
 func TestBookmarks_Toggle(t *testing.T) {
 	m := model{cursor: 5, commits: makeCommits(10)}
 	m = toggleBookmark(m)
-	if !isBookmarked(m, 5) {
-		t.Error("cursor position should be bookmarked")
-	}
+	AssertTrue(t, isBookmarked(m, 5), "cursor position should be bookmarked")
 }
 
 func TestBookmarks_ToggleRemoves(t *testing.T) {
 	c := commit{shortHash: "abc123"}
 	m := model{cursor: 0, commits: []commit{c}, bookmarks: []string{"abc123"}}
 	m = toggleBookmark(m)
-	if isBookmarked(m, 0) {
-		t.Error("bookmark should be removed")
-	}
+	AssertFalse(t, isBookmarked(m, 0), "bookmark should be removed")
 }
 
 func TestBookmarks_JumpToNext(t *testing.T) {
@@ -1035,9 +976,7 @@ func TestBookmarks_JumpToNext(t *testing.T) {
 	}
 	m := model{commits: commits, cursor: 0, bookmarks: []string{"bbb", "ccc"}}
 	m = jumpToNextBookmark(m)
-	if m.cursor != 1 {
-		t.Errorf("expected cursor=1, got %d", m.cursor)
-	}
+	AssertEqual(t, 1, m.cursor, "should jump to next bookmark")
 }
 
 func TestBookmarks_JumpToPrev(t *testing.T) {
@@ -1048,23 +987,17 @@ func TestBookmarks_JumpToPrev(t *testing.T) {
 	}
 	m := model{commits: commits, cursor: 2, bookmarks: []string{"aaa", "bbb"}}
 	m = jumpToPrevBookmark(m)
-	if m.cursor != 1 {
-		t.Errorf("expected cursor=1, got %d", m.cursor)
-	}
+	AssertEqual(t, 1, m.cursor, "should jump to prev bookmark")
 }
 
 // --- detectLanguage ---
 
 func TestDetectLanguage_Go(t *testing.T) {
-	if lang := detectLanguage("main.go"); lang != "go" {
-		t.Errorf("expected 'go', got %q", lang)
-	}
+	AssertEqual(t, "go", detectLanguage("main.go"), "should detect go")
 }
 
 func TestDetectLanguage_Python(t *testing.T) {
-	if lang := detectLanguage("script.py"); lang != "python" {
-		t.Errorf("expected 'python', got %q", lang)
-	}
+	AssertEqual(t, "python", detectLanguage("script.py"), "should detect python")
 }
 
 func TestDetectLanguage_Unknown(t *testing.T) {
