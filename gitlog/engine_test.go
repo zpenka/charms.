@@ -4288,3 +4288,201 @@ func TestRenderAdvancedFilterUI_DisplaysFilterOptions(t *testing.T) {
 	AssertNotNil(t, ui, "should render filter UI")
 	AssertTrue(t, len(ui) > 0, "filter UI should not be empty")
 }
+
+// --- Advanced Analytics: Code Churn Analysis ---
+
+func TestAnalyzeCodeChurn_CalculatesFileChanges(t *testing.T) {
+	fixture := NewTestFixture()
+
+	churn := analyzeCodeChurn(fixture.Commits)
+	AssertNotNil(t, churn, "should calculate code churn")
+	AssertTrue(t, len(churn) > 0, "should have churn data")
+}
+
+func TestGetMostChurnedFiles_RanksFiles(t *testing.T) {
+	fixture := NewTestFixture()
+
+	files := getMostChurnedFiles(fixture.Commits, 5)
+	AssertNotNil(t, files, "should return most churned files")
+}
+
+func TestGetChurnMetricsForFile_CalculatesMetrics(t *testing.T) {
+	churn := getChurnMetricsForFile("main.go", 25, 50)
+	AssertNotNil(t, churn, "should calculate file metrics")
+	AssertEqual(t, "main.go", churn.FileName, "should have correct filename")
+}
+
+func TestRenderChurnAnalysisUI_DisplaysChurn(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderChurnAnalysisUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render churn UI")
+	AssertTrue(t, len(ui) > 0, "churn UI should not be empty")
+	AssertStringContains(t, ui, "Churn", "should contain churn metrics")
+}
+
+// --- Advanced Analytics: Author Expertise Detection ---
+
+func TestDetectAuthorExpertise_IdentifiesExperts(t *testing.T) {
+	fixture := NewTestFixture()
+
+	expertise := detectAuthorExpertise(fixture.Commits)
+	AssertNotNil(t, expertise, "should detect expertise")
+	AssertTrue(t, len(expertise) > 0, "should have expertise data")
+}
+
+func TestGetExpertiseForFile_RanksAuthors(t *testing.T) {
+	fixture := NewTestFixture()
+
+	experts := getExpertiseForFile(fixture.Commits, "utils.go")
+	AssertNotNil(t, experts, "should get file experts")
+}
+
+func TestCalculateExpertiseScore_RanksSkills(t *testing.T) {
+	score := calculateExpertiseScore("Alice", "utils.go", 10, 3)
+	AssertTrue(t, score > 0, "expertise score should be positive")
+}
+
+func TestGetAuthorSpecialties_FindsAreas(t *testing.T) {
+	fixture := NewTestFixture()
+
+	specialties := getAuthorSpecialties("Alice", fixture.Commits)
+	AssertNotNil(t, specialties, "should get author specialties")
+}
+
+func TestRenderExpertiseMapUI_DisplaysExperts(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderExpertiseMapUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render expertise UI")
+	AssertTrue(t, len(ui) > 0, "expertise UI should not be empty")
+	AssertStringContains(t, ui, "Expertise", "should contain expertise info")
+}
+
+// --- Advanced Analytics: Hotspot Detection ---
+
+func TestDetectCodeHotspots_FindsPatterns(t *testing.T) {
+	fixture := NewTestFixture()
+
+	hotspots := detectCodeHotspots(fixture.Commits)
+	AssertNotNil(t, hotspots, "should detect hotspots")
+}
+
+func TestFindFilesChangedTogether_IdentifiesRelationships(t *testing.T) {
+	fixture := NewTestFixture()
+
+	relationships := findFilesChangedTogether(fixture.Commits)
+	AssertNotNil(t, relationships, "should find file relationships")
+}
+
+func TestCalculateHotspotScore_RanksHotspots(t *testing.T) {
+	hotspot := &FileHotspot{
+		FileName:       "api.go",
+		ChangeCount:    50,
+		CochangeCount:  20,
+		AuthorsCount:   3,
+	}
+
+	score := calculateHotspotScore(hotspot)
+	AssertTrue(t, score > 0, "hotspot score should be positive")
+}
+
+func TestGetRelatedFiles_FindsCochanges(t *testing.T) {
+	fixture := NewTestFixture()
+
+	related := getRelatedFiles(fixture.Commits, "main.go")
+	AssertNotNil(t, related, "should get related files")
+}
+
+func TestRenderHotspotUI_DisplaysHotspots(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderHotspotUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render hotspot UI")
+	AssertTrue(t, len(ui) > 0, "hotspot UI should not be empty")
+	AssertStringContains(t, ui, "Hotspot", "should contain hotspot data")
+}
+
+// --- Advanced Analytics: Performance Regression Detection ---
+
+func TestDetectPerformanceRegression_FindsSlowdowns(t *testing.T) {
+	fixture := NewTestFixture()
+
+	regressions := detectPerformanceRegression(fixture.Commits)
+	AssertNotNil(t, regressions, "should detect regressions")
+}
+
+func TestCorrelateWithPerformanceMetrics_FindsCorrelations(t *testing.T) {
+	fixture := NewTestFixture()
+	metrics := map[string]float64{"latency": 100.5, "throughput": 500.0}
+
+	correlation := correlateWithPerformanceMetrics(fixture.Commits, metrics)
+	AssertNotNil(t, correlation, "should correlate metrics")
+}
+
+func TestIdentifyRegressionCauses_AnalyzesCauses(t *testing.T) {
+	fixture := NewTestFixture()
+
+	causes := identifyRegressionCauses(fixture.Commits, 50.0)
+	AssertNotNil(t, causes, "should identify causes")
+}
+
+func TestGetCommitsAffectingPerformance_FiltersCommits(t *testing.T) {
+	fixture := NewTestFixture()
+
+	commits := getCommitsAffectingPerformance(fixture.Commits, 25.0)
+	AssertNotNil(t, commits, "should filter performance-affecting commits")
+}
+
+func TestRenderRegressionAnalysisUI_DisplaysRegressions(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderRegressionAnalysisUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render regression UI")
+	AssertTrue(t, len(ui) > 0, "regression UI should not be empty")
+	AssertStringContains(t, ui, "Regression", "should contain regression info")
+}
+
+// --- Advanced Analytics: Test Coverage Correlation ---
+
+func TestCorrelateWithTestCoverage_AnalyzesCorrelation(t *testing.T) {
+	fixture := NewTestFixture()
+
+	correlation := correlateWithTestCoverage(fixture.Commits)
+	AssertNotNil(t, correlation, "should correlate with test coverage")
+}
+
+func TestTrackCoverageByFile_MonitorsFiles(t *testing.T) {
+	fixture := NewTestFixture()
+
+	coverage := trackCoverageByFile(fixture.Commits)
+	AssertNotNil(t, coverage, "should track file coverage")
+}
+
+func TestIdentifyUncoveredChanges_FindsGaps(t *testing.T) {
+	fixture := NewTestFixture()
+
+	uncovered := identifyUncoveredChanges(fixture.Commits)
+	AssertNotNil(t, uncovered, "should identify uncovered changes")
+}
+
+func TestGetTestCommitsForFile_FiltersByFile(t *testing.T) {
+	fixture := NewTestFixture()
+
+	testCommits := getTestCommitsForFile(fixture.Commits, "utils_test.go")
+	AssertNotNil(t, testCommits, "should get test commits")
+}
+
+func TestCalculateCoverageRisk_RanksRisk(t *testing.T) {
+	risk := calculateCoverageRisk(100, 20, 5)
+	AssertTrue(t, risk >= 0, "coverage risk should be non-negative")
+}
+
+func TestRenderCoverageAnalysisUI_DisplaysCoverage(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderCoverageAnalysisUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render coverage UI")
+	AssertTrue(t, len(ui) > 0, "coverage UI should not be empty")
+	AssertStringContains(t, ui, "Coverage", "should contain coverage metrics")
+}
