@@ -51,6 +51,25 @@ type blameLine struct {
 	text      string
 }
 
+// FilterCache caches filter results with metrics tracking.
+type FilterCache struct {
+	cache   map[string][]commit
+	metrics CacheMetrics
+}
+
+// NewFilterCache creates a new filter cache with metrics.
+func NewFilterCache() *FilterCache {
+	return &FilterCache{
+		cache: make(map[string][]commit),
+		metrics: CacheMetrics{
+			Size:    0,
+			MaxSize: 100,
+			Hits:    0,
+			Misses:  0,
+		},
+	}
+}
+
 type model struct {
 	commits    []commit
 	cursor     int
@@ -805,6 +824,40 @@ func parseCommits(output string) []commit {
 	return commits
 }
 
+// parseCommitsWithPool parses commits using memory pooling for efficiency.
+func parseCommitsWithPool(output string) []commit {
+	pool := NewMemoryPool(100)
+	var commits []commit
+
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\x00", 5)
+		if len(parts) < 5 {
+			continue
+		}
+
+		// Get commit from pool or create new
+		c := pool.Get(func() interface{} {
+			return &commit{}
+		}).(*commit)
+
+		// Populate fields
+		c.hash = parts[0]
+		c.shortHash = parts[1]
+		c.author = parts[2]
+		c.when = parts[3]
+		c.subject = parts[4]
+
+		commits = append(commits, *c)
+
+		// Return to pool for reuse
+		pool.Put(c)
+	}
+	return commits
+}
+
 // parseDiff classifies each line of a unified diff by type.
 func parseDiff(raw string) []diffLine {
 	var lines []diffLine
@@ -832,6 +885,35 @@ func parseDiff(raw string) []diffLine {
 		lines = append(lines, diffLine{kind, text})
 	}
 	return lines
+}
+
+// processDiffBatch processes diff lines using batch processing for efficiency.
+func processDiffBatch(processor *BatchProcessor, lines []diffLine) []diffLine {
+	var results []diffLine
+
+	for _, line := range lines {
+		processor.Add(line)
+
+		// Process batch when full
+		if processor.IsFull() {
+			batch := processor.Get()
+			for _, item := range batch {
+				if dl, ok := item.(diffLine); ok {
+					results = append(results, dl)
+				}
+			}
+		}
+	}
+
+	// Process remaining items
+	remaining := processor.Get()
+	for _, item := range remaining {
+		if dl, ok := item.(diffLine); ok {
+			results = append(results, dl)
+		}
+	}
+
+	return results
 }
 
 // truncate cuts s to at most max visible runes, appending "…" if shortened.
@@ -969,6 +1051,31 @@ func filterCommits(commits []commit, query string) []commit {
 		}
 	}
 	return out
+}
+
+// filterCommitsWithCache filters commits with result caching and metrics tracking.
+func filterCommitsWithCache(cache *FilterCache, commits []commit, query string) []commit {
+	if query == "" {
+		return commits
+	}
+
+	// Check cache first
+	if cached, exists := cache.cache[query]; exists {
+		cache.metrics.Hits++
+		return cached
+	}
+
+	// Cache miss - filter and store
+	cache.metrics.Misses++
+	result := filterCommits(commits, query)
+
+	// Store in cache if not full
+	if cache.metrics.Size < cache.metrics.MaxSize {
+		cache.cache[query] = result
+		cache.metrics.Size++
+	}
+
+	return result
 }
 
 // visibleCommits returns the commit list after applying all active filters:

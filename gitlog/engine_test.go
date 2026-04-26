@@ -141,48 +141,33 @@ func TestParseDiff_TextPreserved(t *testing.T) {
 // --- truncate ---
 
 func TestTruncate_Short(t *testing.T) {
-	if truncate("hello", 10) != "hello" {
-		t.Error("should not truncate")
-	}
+	AssertEqual(t, "hello", truncate("hello", 10), "should not truncate")
 }
 
 func TestTruncate_Exact(t *testing.T) {
-	if truncate("hello", 5) != "hello" {
-		t.Error("exact length should not truncate")
-	}
+	AssertEqual(t, "hello", truncate("hello", 5), "exact length should not truncate")
 }
 
 func TestTruncate_Long(t *testing.T) {
-	got := truncate("hello world", 7)
-	if got != "hello …" {
-		t.Errorf("got %q", got)
-	}
+	AssertEqual(t, "hello …", truncate("hello world", 7), "should truncate with ellipsis")
 }
 
 func TestTruncate_One(t *testing.T) {
-	if truncate("hi", 1) != "…" {
-		t.Errorf("got %q", truncate("hi", 1))
-	}
+	AssertEqual(t, "…", truncate("hi", 1), "max=1 should return ellipsis")
 }
 
 func TestTruncate_Zero(t *testing.T) {
-	if truncate("hi", 0) != "" {
-		t.Errorf("got %q", truncate("hi", 0))
-	}
+	AssertEqual(t, "", truncate("hi", 0), "max=0 should return empty")
 }
 
 // --- firstWord ---
 
 func TestFirstWord_WithSpace(t *testing.T) {
-	if firstWord("John Doe") != "John" {
-		t.Errorf("got %q", firstWord("John Doe"))
-	}
+	AssertEqual(t, "John", firstWord("John Doe"), "should extract first word")
 }
 
 func TestFirstWord_NoSpace(t *testing.T) {
-	if firstWord("John") != "John" {
-		t.Errorf("got %q", firstWord("John"))
-	}
+	AssertEqual(t, "John", firstWord("John"), "single word should return as-is")
 }
 
 // --- cursor navigation ---
@@ -190,25 +175,19 @@ func TestFirstWord_NoSpace(t *testing.T) {
 func TestMoveCursorDown(t *testing.T) {
 	m := model{commits: makeCommits(3), cursor: 0}
 	m = moveCursorDown(m)
-	if m.cursor != 1 {
-		t.Errorf("expected 1, got %d", m.cursor)
-	}
+	AssertEqual(t, 1, m.cursor, "cursor should advance")
 }
 
 func TestMoveCursorDown_AtEnd(t *testing.T) {
 	m := model{commits: makeCommits(3), cursor: 2}
 	m = moveCursorDown(m)
-	if m.cursor != 2 {
-		t.Errorf("expected 2, got %d", m.cursor)
-	}
+	AssertEqual(t, 2, m.cursor, "cursor should clamp at end")
 }
 
 func TestMoveCursorDown_ResetsDiffOffset(t *testing.T) {
 	m := model{commits: makeCommits(3), cursor: 0, diffOffset: 10}
 	m = moveCursorDown(m)
-	if m.diffOffset != 0 {
-		t.Error("diffOffset should reset on commit change")
-	}
+	AssertEqual(t, 0, m.diffOffset, "diffOffset should reset on commit change")
 }
 
 func TestMoveCursorUp(t *testing.T) {
@@ -240,36 +219,27 @@ func TestMoveCursorUp_ResetsDiffOffset(t *testing.T) {
 func TestScrollDiffDown(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
 	m = scrollDiffDown(m, 5)
-	if m.diffOffset != 5 {
-		t.Errorf("expected 5, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 5, m.diffOffset, "should scroll down")
 }
 
 func TestScrollDiffUp(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 10, height: 30}
 	m = scrollDiffUp(m, 3)
-	if m.diffOffset != 7 {
-		t.Errorf("expected 7, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 7, m.diffOffset, "should scroll up")
 }
 
 func TestScrollDiffDown_ClampsToMax(t *testing.T) {
-	// height=30 → diffPanelHeight = 30-7 = 23, max = 50-23 = 27
 	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
 	m = scrollDiffDown(m, 1000)
 	panelH := diffPanelHeight(m)
 	expected := len(m.diffLines) - panelH
-	if m.diffOffset != expected {
-		t.Errorf("expected clamped to %d, got %d", expected, m.diffOffset)
-	}
+	AssertEqual(t, expected, m.diffOffset, "should clamp to max")
 }
 
 func TestScrollDiffUp_ClampsToZero(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 5, height: 30}
 	m = scrollDiffUp(m, 1000)
-	if m.diffOffset != 0 {
-		t.Errorf("expected 0, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 0, m.diffOffset, "should clamp to zero")
 }
 
 func TestScrollDiffDown_FitsInPanel(t *testing.T) {
@@ -286,62 +256,46 @@ func TestScrollDiffDown_FitsInPanel(t *testing.T) {
 func TestSwitchPanel_TowardsDiff(t *testing.T) {
 	m := model{focus: panelList}
 	m = switchPanel(m)
-	if m.focus != panelDiff {
-		t.Error("expected panelDiff")
-	}
+	AssertEqual(t, panelDiff, m.focus, "should switch to diff panel")
 }
 
 func TestSwitchPanel_TowardsList(t *testing.T) {
 	m := model{focus: panelDiff}
 	m = switchPanel(m)
-	if m.focus != panelList {
-		t.Error("expected panelList")
-	}
+	AssertEqual(t, panelList, m.focus, "should switch to list panel")
 }
 
 // --- panel sizing ---
 
 func TestListPanelWidth_Minimum(t *testing.T) {
-	if listPanelWidth(40) < 36 {
-		t.Error("should be at least 36")
-	}
+	AssertIntRange(t, listPanelWidth(40), 36, 52, "panel width should be in range")
 }
 
 func TestListPanelWidth_Maximum(t *testing.T) {
-	if listPanelWidth(300) > 52 {
-		t.Error("should be at most 52")
-	}
+	AssertTrue(t, listPanelWidth(300) <= 52, "panel width should be at most 52")
 }
 
 func TestListPanelWidth_ThirdOfWidth(t *testing.T) {
 	w := listPanelWidth(120)
-	if w < 36 || w > 52 {
-		t.Errorf("unexpected width %d for total=120", w)
-	}
+	AssertIntRange(t, w, 36, 52, "width for total=120 should be in range")
 }
 
 func TestDiffPanelWidth(t *testing.T) {
 	total := 120
 	lw := listPanelWidth(total)
 	dw := diffPanelWidth(total)
-	if lw+dw+1 != total {
-		t.Errorf("lw(%d) + dw(%d) + 1 != %d", lw, dw, total)
-	}
+	AssertEqual(t, total, lw+dw+1, "panel widths should sum to total")
 }
 
 func TestDiffPanelHeight_Normal(t *testing.T) {
 	m := model{height: 40}
 	h := diffPanelHeight(m)
-	if h != 33 { // 40 - 7
-		t.Errorf("expected 33, got %d", h)
-	}
+	AssertEqual(t, 33, h, "height should be 40-7=33")
 }
 
 func TestDiffPanelHeight_Minimum(t *testing.T) {
 	m := model{height: 5}
-	if diffPanelHeight(m) < 5 {
-		t.Error("should be at least 5")
-	}
+	AssertTrue(t, diffPanelHeight(m) >= 5, "height should be at least 5")
 }
 
 // --- parseFileItems ---
@@ -382,21 +336,11 @@ func TestParseFileItems_Multiple(t *testing.T) {
 		{lineAdded, "+new"},
 	}
 	items := parseFileItems(lines)
-	if len(items) != 2 {
-		t.Fatalf("expected 2, got %d", len(items))
-	}
-	if items[0].path != "a.go" {
-		t.Errorf("first path: got %q", items[0].path)
-	}
-	if items[0].diffIdx != 0 {
-		t.Errorf("first diffIdx: got %d", items[0].diffIdx)
-	}
-	if items[1].path != "path/to/b.go" {
-		t.Errorf("second path: got %q", items[1].path)
-	}
-	if items[1].diffIdx != 2 {
-		t.Errorf("second diffIdx: got %d", items[1].diffIdx)
-	}
+	AssertLen(t, items, 2, "should parse 2 files")
+	AssertEqual(t, "a.go", items[0].path, "first path should match")
+	AssertEqual(t, 0, items[0].diffIdx, "first diffIdx should be 0")
+	AssertEqual(t, "path/to/b.go", items[1].path, "second path should match")
+	AssertEqual(t, 2, items[1].diffIdx, "second diffIdx should be 2")
 }
 
 func TestParseFileItems_SkipsNonDiffGit(t *testing.T) {
@@ -406,9 +350,7 @@ func TestParseFileItems_SkipsNonDiffGit(t *testing.T) {
 		{lineMeta, "diff --git a/bar.go b/bar.go"},
 	}
 	items := parseFileItems(lines)
-	if len(items) != 1 {
-		t.Fatalf("expected 1 (only diff --git lines), got %d", len(items))
-	}
+	AssertLen(t, items, 1, "should only parse diff --git lines")
 }
 
 // --- filterCommits ---
@@ -422,70 +364,55 @@ func makeNamedCommits() []commit {
 }
 
 func TestFilterCommits_EmptyQuery(t *testing.T) {
-	commits := makeNamedCommits()
-	result := filterCommits(commits, "")
-	if len(result) != 3 {
-		t.Errorf("empty query should return all, got %d", len(result))
-	}
+	result := filterCommits(makeNamedCommits(), "")
+	AssertLen(t, result, 3, "empty query should return all")
 }
 
 func TestFilterCommits_BySubject(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "login")
-	if len(result) != 1 || result[0].subject != "Fix login bug" {
-		t.Errorf("expected Fix login bug, got %v", result)
-	}
+	AssertLen(t, result, 1, "should find login commit")
+	AssertEqual(t, "Fix login bug", result[0].subject, "subject should match")
 }
 
 func TestFilterCommits_ByAuthor(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "Jane")
-	if len(result) != 1 || result[0].author != "Jane Smith" {
-		t.Errorf("expected Jane Smith commit, got %v", result)
-	}
+	AssertLen(t, result, 1, "should find Jane's commit")
+	AssertEqual(t, "Jane Smith", result[0].author, "author should match")
 }
 
 func TestFilterCommits_ByHash(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "bbb")
-	if len(result) != 1 || result[0].shortHash != "bbb2222" {
-		t.Errorf("expected bbb2222, got %v", result)
-	}
+	AssertLen(t, result, 1, "should find by hash")
+	AssertEqual(t, "bbb2222", result[0].shortHash, "hash should match")
 }
 
 func TestFilterCommits_CaseInsensitive(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "LOGIN")
-	if len(result) != 1 {
-		t.Errorf("filter should be case-insensitive, got %d", len(result))
-	}
+	AssertLen(t, result, 1, "filter should be case-insensitive")
 }
 
 func TestFilterCommits_NoMatch(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "zzznomatch")
-	if len(result) != 0 {
-		t.Errorf("expected 0 results, got %d", len(result))
-	}
+	AssertLen(t, result, 0, "should return no matches")
 }
 
 func TestFilterCommits_MultipleMatches(t *testing.T) {
 	result := filterCommits(makeNamedCommits(), "John")
-	if len(result) != 2 {
-		t.Errorf("expected 2 John Doe commits, got %d", len(result))
-	}
+	AssertLen(t, result, 2, "should find multiple John commits")
 }
 
 // --- visibleCommits ---
 
 func TestVisibleCommits_NoQuery(t *testing.T) {
 	m := model{commits: makeCommits(5)}
-	if len(visibleCommits(m)) != 5 {
-		t.Error("no query should return all commits")
-	}
+	AssertLen(t, visibleCommits(m), 5, "no query should return all commits")
 }
 
 func TestVisibleCommits_WithQuery(t *testing.T) {
 	m := model{commits: makeNamedCommits(), query: "login"}
 	vc := visibleCommits(m)
-	if len(vc) != 1 || vc[0].subject != "Fix login bug" {
-		t.Errorf("unexpected result: %v", vc)
-	}
+	AssertLen(t, vc, 1, "should find login commit")
+	AssertEqual(t, "Fix login bug", vc[0].subject, "subject should match")
 }
 
 // --- scrollToDiffLine ---
@@ -493,28 +420,21 @@ func TestVisibleCommits_WithQuery(t *testing.T) {
 func TestScrollToDiffLine(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
 	m = scrollToDiffLine(m, 10)
-	if m.diffOffset != 10 {
-		t.Errorf("expected 10, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 10, m.diffOffset, "should scroll to line")
 }
 
 func TestScrollToDiffLine_ClampsToMax(t *testing.T) {
-	// height=30 → panelH=23, max=50-23=27
 	m := model{diffLines: makeDiffLines(50), height: 30}
 	m = scrollToDiffLine(m, 1000)
 	panelH := diffPanelHeight(m)
 	expected := len(m.diffLines) - panelH
-	if m.diffOffset != expected {
-		t.Errorf("expected %d, got %d", expected, m.diffOffset)
-	}
+	AssertEqual(t, expected, m.diffOffset, "should clamp to max")
 }
 
 func TestScrollToDiffLine_ClampsToZero(t *testing.T) {
 	m := model{diffLines: makeDiffLines(50), height: 30}
 	m = scrollToDiffLine(m, -5)
-	if m.diffOffset != 0 {
-		t.Errorf("expected 0, got %d", m.diffOffset)
-	}
+	AssertEqual(t, 0, m.diffOffset, "should clamp to zero")
 }
 
 // --- toggleFileView ---
@@ -522,20 +442,14 @@ func TestScrollToDiffLine_ClampsToZero(t *testing.T) {
 func TestToggleFileView_Show(t *testing.T) {
 	m := model{showFiles: false}
 	m = toggleFileView(m)
-	if !m.showFiles {
-		t.Error("expected showFiles=true")
-	}
+	AssertTrue(t, m.showFiles, "should show files")
 }
 
 func TestToggleFileView_Hide(t *testing.T) {
 	m := model{showFiles: true, fileCursor: 3}
 	m = toggleFileView(m)
-	if m.showFiles {
-		t.Error("expected showFiles=false")
-	}
-	if m.fileCursor != 0 {
-		t.Error("expected fileCursor reset to 0 on hide")
-	}
+	AssertFalse(t, m.showFiles, "should hide files")
+	AssertEqual(t, 0, m.fileCursor, "cursor should reset on hide")
 }
 
 // --- parseBranches ---
@@ -543,15 +457,9 @@ func TestToggleFileView_Hide(t *testing.T) {
 func TestParseBranches_Simple(t *testing.T) {
 	input := "  main\n* develop\n  remotes/origin/main\n"
 	branches := parseBranches(input)
-	if len(branches) != 3 {
-		t.Fatalf("expected 3, got %d: %v", len(branches), branches)
-	}
-	if branches[0] != "main" {
-		t.Errorf("first: got %q", branches[0])
-	}
-	if branches[1] != "develop" {
-		t.Errorf("second: got %q", branches[1])
-	}
+	AssertLen(t, branches, 3, "should parse 3 branches")
+	AssertEqual(t, "main", branches[0], "first branch should be main")
+	AssertEqual(t, "develop", branches[1], "second branch should be develop")
 }
 
 func TestParseBranches_Empty(t *testing.T) {
@@ -966,12 +874,9 @@ func TestNavigationHistory_CannotGoForwardAtEnd(t *testing.T) {
 
 func TestCommitStats_Empty(t *testing.T) {
 	stats := commitStats([]diffLine{})
-	if stats.filesChanged != 0 {
-		t.Errorf("empty diff should have 0 files, got %d", stats.filesChanged)
-	}
-	if stats.insertions != 0 || stats.deletions != 0 {
-		t.Errorf("empty diff should have 0 changes")
-	}
+	AssertEqual(t, 0, stats.filesChanged, "empty diff should have 0 files")
+	AssertEqual(t, 0, stats.insertions, "empty diff should have 0 insertions")
+	AssertEqual(t, 0, stats.deletions, "empty diff should have 0 deletions")
 }
 
 func TestCommitStats_CountsFiles(t *testing.T) {
@@ -982,9 +887,7 @@ func TestCommitStats_CountsFiles(t *testing.T) {
 		{lineRemoved, "-line"},
 	}
 	stats := commitStats(lines)
-	if stats.filesChanged != 2 {
-		t.Errorf("expected 2 files, got %d", stats.filesChanged)
-	}
+	AssertEqual(t, 2, stats.filesChanged, "should count 2 files")
 }
 
 func TestCommitStats_CountsInsertionsAndDeletions(t *testing.T) {
@@ -997,12 +900,8 @@ func TestCommitStats_CountsInsertionsAndDeletions(t *testing.T) {
 		{lineContext, " context"},
 	}
 	stats := commitStats(lines)
-	if stats.insertions != 2 {
-		t.Errorf("expected 2 insertions, got %d", stats.insertions)
-	}
-	if stats.deletions != 3 {
-		t.Errorf("expected 3 deletions, got %d", stats.deletions)
-	}
+	AssertEqual(t, 2, stats.insertions, "should count 2 insertions")
+	AssertEqual(t, 3, stats.deletions, "should count 3 deletions")
 }
 
 // --- generateCommitMessage ---
@@ -1059,18 +958,14 @@ func TestBookmarks_InitEmpty(t *testing.T) {
 func TestBookmarks_Toggle(t *testing.T) {
 	m := model{cursor: 5, commits: makeCommits(10)}
 	m = toggleBookmark(m)
-	if !isBookmarked(m, 5) {
-		t.Error("cursor position should be bookmarked")
-	}
+	AssertTrue(t, isBookmarked(m, 5), "cursor position should be bookmarked")
 }
 
 func TestBookmarks_ToggleRemoves(t *testing.T) {
 	c := commit{shortHash: "abc123"}
 	m := model{cursor: 0, commits: []commit{c}, bookmarks: []string{"abc123"}}
 	m = toggleBookmark(m)
-	if isBookmarked(m, 0) {
-		t.Error("bookmark should be removed")
-	}
+	AssertFalse(t, isBookmarked(m, 0), "bookmark should be removed")
 }
 
 func TestBookmarks_JumpToNext(t *testing.T) {
@@ -1081,9 +976,7 @@ func TestBookmarks_JumpToNext(t *testing.T) {
 	}
 	m := model{commits: commits, cursor: 0, bookmarks: []string{"bbb", "ccc"}}
 	m = jumpToNextBookmark(m)
-	if m.cursor != 1 {
-		t.Errorf("expected cursor=1, got %d", m.cursor)
-	}
+	AssertEqual(t, 1, m.cursor, "should jump to next bookmark")
 }
 
 func TestBookmarks_JumpToPrev(t *testing.T) {
@@ -1094,23 +987,17 @@ func TestBookmarks_JumpToPrev(t *testing.T) {
 	}
 	m := model{commits: commits, cursor: 2, bookmarks: []string{"aaa", "bbb"}}
 	m = jumpToPrevBookmark(m)
-	if m.cursor != 1 {
-		t.Errorf("expected cursor=1, got %d", m.cursor)
-	}
+	AssertEqual(t, 1, m.cursor, "should jump to prev bookmark")
 }
 
 // --- detectLanguage ---
 
 func TestDetectLanguage_Go(t *testing.T) {
-	if lang := detectLanguage("main.go"); lang != "go" {
-		t.Errorf("expected 'go', got %q", lang)
-	}
+	AssertEqual(t, "go", detectLanguage("main.go"), "should detect go")
 }
 
 func TestDetectLanguage_Python(t *testing.T) {
-	if lang := detectLanguage("script.py"); lang != "python" {
-		t.Errorf("expected 'python', got %q", lang)
-	}
+	AssertEqual(t, "python", detectLanguage("script.py"), "should detect python")
 }
 
 func TestDetectLanguage_Unknown(t *testing.T) {
@@ -3954,9 +3841,7 @@ func TestBackgroundIndexing_BuildsIndex(t *testing.T) {
 // Feature 29: Lazy Blame Loading
 func TestLazyBlame_LoadsOnDemand(t *testing.T) {
 	blame := lazyLoadBlame("aaa", "main.go")
-	if blame == nil {
-		t.Error("should lazy load blame")
-	}
+	AssertNotNil(t, blame, "should lazy load blame")
 }
 
 // Feature 30: Memory Optimization
@@ -3964,7 +3849,165 @@ func TestMemoryOptimization_TracksUsage(t *testing.T) {
 	metrics := optimizeMemory([]commit{
 		{hash: "aaa", subject: "Fix"},
 	})
-	if metrics.usageBytes == 0 {
-		t.Error("should track memory")
-	}
+	AssertTrue(t, metrics.usageBytes > 0, "should track memory")
+}
+
+// --- Optimization: LazyLoader Pattern ---
+
+func TestLazyLoadAnalysis_DefersCost(t *testing.T) {
+	loader := NewLazyLoader(func() interface{} {
+		return detectHotspots([]commit{
+			{hash: "aaa", subject: "file1.go file2.go"},
+			{hash: "bbb", subject: "file1.go"},
+		})
+	})
+	AssertFalse(t, loader.IsLoaded(), "should not load immediately")
+	data := loader.Load()
+	AssertNotNil(t, data, "should load data on demand")
+	AssertTrue(t, loader.IsLoaded(), "should be marked loaded after Load()")
+}
+
+// --- Optimization: MemoryPool Pattern ---
+
+func TestMemoryPool_Reuses(t *testing.T) {
+	pool := NewMemoryPool(5)
+	
+	// Get object from empty pool
+	obj1 := pool.Get(func() interface{} {
+		return &commit{hash: "new1"}
+	})
+	AssertNotNil(t, obj1, "should create object")
+	
+	// Put back to pool
+	pool.Put(obj1)
+	
+	// Get again should reuse
+	obj2 := pool.Get(func() interface{} {
+		return &commit{hash: "new2"}
+	})
+	AssertEqual(t, obj1, obj2, "should reuse pooled object")
+}
+
+func TestMemoryPool_CreateWhenEmpty(t *testing.T) {
+	pool := NewMemoryPool(1)
+	
+	// First object
+	obj1 := pool.Get(func() interface{} {
+		return &commit{hash: "first"}
+	})
+	AssertNotNil(t, obj1, "should create first object")
+	
+	// Get second without returning first
+	obj2 := pool.Get(func() interface{} {
+		return &commit{hash: "second"}
+	})
+	AssertNotNil(t, obj2, "should create new object when pool empty")
+	AssertNotEqual(t, obj1, obj2, "should be different objects")
+}
+
+// --- MemoryPool Integration ---
+
+func TestParseCommitsWithPool_Reuses(t *testing.T) {
+	input := "abc1234def5678901234567890123456789012\x00abc1234\x00John Doe\x002 days ago\x00Fix login bug\n" +
+		"xyz9876qwerty12345678901234567890123456\x00xyz9876\x00Jane Smith\x005 days ago\x00Add user model\n"
+	
+	commits := parseCommitsWithPool(input)
+	AssertLen(t, commits, 2, "should parse 2 commits with pool")
+	AssertEqual(t, "John Doe", commits[0].author, "first author should match")
+	AssertEqual(t, "Jane Smith", commits[1].author, "second author should match")
+}
+
+// --- Optimization: CacheMetrics Pattern ---
+
+func TestFilterCommitsWithCache_CachesResults(t *testing.T) {
+	cache := NewFilterCache()
+	commits := makeNamedCommits()
+	
+	// First call - cache miss
+	result1 := filterCommitsWithCache(cache, commits, "login")
+	AssertLen(t, result1, 1, "should find login commit")
+	AssertEqual(t, 0, cache.metrics.Hits, "cache should have 0 hits initially")
+	
+	// Second call - cache hit
+	result2 := filterCommitsWithCache(cache, commits, "login")
+	AssertLen(t, result2, 1, "should return same result")
+	AssertEqual(t, 1, cache.metrics.Hits, "cache should have 1 hit")
+	
+	// Different query - cache miss
+	result3 := filterCommitsWithCache(cache, commits, "user")
+	AssertLen(t, result3, 1, "should find user commit")
+	AssertEqual(t, 1, cache.metrics.Hits, "hits should still be 1")
+}
+
+// --- Optimization: BatchProcessor Pattern ---
+
+func TestBatchProcessDiffs_ProcessesInBatches(t *testing.T) {
+	lines := makeDiffLines(25)
+	processor := NewBatchProcessor(10, 1000)
+	
+	results := processDiffBatch(processor, lines)
+	AssertTrue(t, len(results) > 0, "should process batches")
+	AssertTrue(t, len(results) <= 25, "results should not exceed input")
+}
+
+func TestBatchProcessor_IsFull(t *testing.T) {
+	processor := NewBatchProcessor(3, 1000)
+	
+	processor.Add("item1")
+	AssertFalse(t, processor.IsFull(), "batch should not be full with 1 item")
+	
+	processor.Add("item2")
+	processor.Add("item3")
+	AssertTrue(t, processor.IsFull(), "batch should be full with 3 items")
+}
+
+// --- Optimization: CircularBuffer Pattern ---
+
+func TestCircularBuffer_StoresAndRetrievesItems(t *testing.T) {
+	buffer := NewCircularBuffer(5)
+	
+	buffer.Push("commit1")
+	buffer.Push("commit2")
+	buffer.Push("commit3")
+	
+	items := buffer.GetAll()
+	AssertLen(t, items, 3, "should store 3 items")
+	AssertEqual(t, 3, buffer.Size(), "size should be 3")
+}
+
+func TestCircularBuffer_Wraps(t *testing.T) {
+	buffer := NewCircularBuffer(3)
+	
+	buffer.Push("a")
+	buffer.Push("b")
+	buffer.Push("c")
+	buffer.Push("d") // Should wrap and overwrite "a"
+	
+	items := buffer.GetAll()
+	AssertLen(t, items, 3, "should maintain max capacity")
+}
+
+// --- Optimization: RateLimiter Pattern ---
+
+func TestRateLimiter_AllowsOperations(t *testing.T) {
+	limiter := NewRateLimiter(100) // 100 ops per second
+	
+	allowed := limiter.Allow()
+	AssertTrue(t, allowed, "should allow first operation")
+	
+	allowed = limiter.Allow()
+	AssertTrue(t, allowed, "should allow second operation")
+}
+
+// --- Optimization: Metrics Pattern ---
+
+func TestMetrics_TracksOperations(t *testing.T) {
+	metrics := NewMetrics()
+	
+	metrics.RecordOperation("filter", true)
+	metrics.RecordOperation("filter", true)
+	metrics.RecordOperation("filter", false)
+	
+	rate := metrics.GetSuccessRate("filter")
+	AssertTrue(t, rate > 0 && rate <= 1, "success rate should be between 0 and 1")
 }
