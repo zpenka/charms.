@@ -3582,6 +3582,14 @@ func buildContributorFlame(commits []commit) []contributorFlameData {
 			percentage: pct,
 		})
 	}
+	// Sort by commit count descending
+	for i := 0; i < len(flame)-1; i++ {
+		for j := i + 1; j < len(flame); j++ {
+			if flame[j].commits > flame[i].commits {
+				flame[i], flame[j] = flame[j], flame[i]
+			}
+		}
+	}
 	return flame
 }
 
