@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Read(//Users/zpenka/.claude/**)",
+      "Bash(claude mcp *)",
+      "Bash(npx -y @upstash/context7-mcp@latest)",
+      "Bash(command -v npx)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/zpenka/.nvm/versions/**)",
+      "Read(//Users/zpenka/.volta/bin/**)",
+      "Read(//opt/homebrew/opt/**)",
+      "Bash(/usr/local/bin/node --version)",
+      "Read(//Users/zpenka/Git/**)",
+      "Read(//Users/zpenka/Git/charms/**)",
+      "WebSearch",
+      "WebFetch(domain:charm.land)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(go mod *)",
+      "Read(//usr/local/go/bin/**)",
+      "Read(//Users/zpenka/go/bin/**)",
+      "Bash(brew list *)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/local/**)",
+      "Bash(/opt/homebrew/bin/go mod *)",
+      "Bash(/opt/homebrew/bin/go build *)",
+      "Bash(/opt/homebrew/bin/go test *)",
+      "Bash(go test *)",
+      "Bash(go tool *)",
+      "Bash(*)"
+    ]
+  }
+}

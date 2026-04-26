@@ -289,3 +289,92 @@ func TestNavigationHistory_CannotGoForwardAtEnd(t *testing.T) {
 	}
 }
 
+// --- cursor movement ---
+
+func TestMoveCursorDown(t *testing.T) {
+	m := model{commits: makeCommits(3), cursor: 0}
+	m = moveCursorDown(m)
+	AssertEqual(t, 1, m.cursor, "cursor should advance")
+}
+
+func TestMoveCursorDown_AtEnd(t *testing.T) {
+	m := model{commits: makeCommits(3), cursor: 2}
+	m = moveCursorDown(m)
+	AssertEqual(t, 2, m.cursor, "cursor should clamp at end")
+}
+
+func TestMoveCursorDown_ResetsDiffOffset(t *testing.T) {
+	m := model{commits: makeCommits(3), cursor: 0, diffOffset: 10}
+	m = moveCursorDown(m)
+	AssertEqual(t, 0, m.diffOffset, "diffOffset should reset on commit change")
+}
+
+func TestMoveCursorUp(t *testing.T) {
+	m := model{commits: makeCommits(3), cursor: 2}
+	m = moveCursorUp(m)
+	if m.cursor != 1 {
+		t.Errorf("expected 1, got %d", m.cursor)
+	}
+}
+
+func TestMoveCursorUp_AtStart(t *testing.T) {
+	m := model{commits: makeCommits(3), cursor: 0}
+	m = moveCursorUp(m)
+	if m.cursor != 0 {
+		t.Errorf("expected 0, got %d", m.cursor)
+	}
+}
+
+func TestMoveCursorUp_ResetsDiffOffset(t *testing.T) {
+	m := model{commits: makeCommits(3), cursor: 2, diffOffset: 5}
+	m = moveCursorUp(m)
+	if m.diffOffset != 0 {
+		t.Error("diffOffset should reset on commit change")
+	}
+}
+
+// --- diff scrolling ---
+
+func TestScrollDiffDown(t *testing.T) {
+	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
+	m = scrollDiffDown(m, 5)
+	AssertEqual(t, 5, m.diffOffset, "should scroll down")
+}
+
+func TestScrollDiffUp(t *testing.T) {
+	m := model{diffLines: makeDiffLines(50), diffOffset: 10, height: 30}
+	m = scrollDiffUp(m, 3)
+	AssertEqual(t, 7, m.diffOffset, "should scroll up")
+}
+
+func TestScrollDiffDown_ClampsToMax(t *testing.T) {
+	m := model{diffLines: makeDiffLines(50), diffOffset: 0, height: 30}
+	initialOffset := m.diffOffset
+	m = scrollDiffDown(m, 100)
+	AssertTrue(t, m.diffOffset >= initialOffset, "should not decrease offset when scrolling down")
+}
+
+func TestScrollDiffUp_ClampsToZero(t *testing.T) {
+	m := model{diffLines: makeDiffLines(50), diffOffset: 5, height: 30}
+	m = scrollDiffUp(m, 100)
+	AssertEqual(t, 0, m.diffOffset, "should clamp to zero")
+}
+
+func TestScrollDiffDown_FitsInPanel(t *testing.T) {
+	// fewer lines than panel height — can't scroll
+	m := model{diffLines: makeDiffLines(5), diffOffset: 0, height: 30}
+	m = scrollDiffDown(m, 10)
+	if m.diffOffset != 0 {
+		t.Errorf("expected 0 when content fits panel, got %d", m.diffOffset)
+	}
+}
+
+// --- panel sizing ---
+
+func TestDiffPanelWidth(t *testing.T) {
+	total := 120
+	lw := listPanelWidth(total)
+	dw := diffPanelWidth(total)
+	AssertEqual(t, total, lw+dw+1, "panel widths should sum to total")
+}
+
