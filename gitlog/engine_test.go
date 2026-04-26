@@ -3866,3 +3866,75 @@ func TestLazyLoadAnalysis_DefersCost(t *testing.T) {
 	AssertNotNil(t, data, "should load data on demand")
 	AssertTrue(t, loader.IsLoaded(), "should be marked loaded after Load()")
 }
+
+// --- Optimization: MemoryPool Pattern ---
+
+func TestMemoryPool_Reuses(t *testing.T) {
+	pool := NewMemoryPool(5)
+	
+	// Get object from empty pool
+	obj1 := pool.Get(func() interface{} {
+		return &commit{hash: "new1"}
+	})
+	AssertNotNil(t, obj1, "should create object")
+	
+	// Put back to pool
+	pool.Put(obj1)
+	
+	// Get again should reuse
+	obj2 := pool.Get(func() interface{} {
+		return &commit{hash: "new2"}
+	})
+	AssertEqual(t, obj1, obj2, "should reuse pooled object")
+}
+
+func TestMemoryPool_CreateWhenEmpty(t *testing.T) {
+	pool := NewMemoryPool(1)
+	
+	// First object
+	obj1 := pool.Get(func() interface{} {
+		return &commit{hash: "first"}
+	})
+	AssertNotNil(t, obj1, "should create first object")
+	
+	// Get second without returning first
+	obj2 := pool.Get(func() interface{} {
+		return &commit{hash: "second"}
+	})
+	AssertNotNil(t, obj2, "should create new object when pool empty")
+	AssertNotEqual(t, obj1, obj2, "should be different objects")
+}
+
+// --- MemoryPool Integration ---
+
+func TestParseCommitsWithPool_Reuses(t *testing.T) {
+	input := "abc1234def5678901234567890123456789012\x00abc1234\x00John Doe\x002 days ago\x00Fix login bug\n" +
+		"xyz9876qwerty12345678901234567890123456\x00xyz9876\x00Jane Smith\x005 days ago\x00Add user model\n"
+	
+	commits := parseCommitsWithPool(input)
+	AssertLen(t, commits, 2, "should parse 2 commits with pool")
+	AssertEqual(t, "John Doe", commits[0].author, "first author should match")
+	AssertEqual(t, "Jane Smith", commits[1].author, "second author should match")
+}
+
+// --- Optimization: CacheMetrics Pattern ---
+
+func TestFilterCommitsWithCache_CachesResults(t *testing.T) {
+	cache := NewFilterCache()
+	commits := makeNamedCommits()
+	
+	// First call - cache miss
+	result1 := filterCommitsWithCache(cache, commits, "login")
+	AssertLen(t, result1, 1, "should find login commit")
+	AssertEqual(t, 0, cache.metrics.Hits, "cache should have 0 hits initially")
+	
+	// Second call - cache hit
+	result2 := filterCommitsWithCache(cache, commits, "login")
+	AssertLen(t, result2, 1, "should return same result")
+	AssertEqual(t, 1, cache.metrics.Hits, "cache should have 1 hit")
+	
+	// Different query - cache miss
+	result3 := filterCommitsWithCache(cache, commits, "user")
+	AssertLen(t, result3, 1, "should find user commit")
+	AssertEqual(t, 1, cache.metrics.Hits, "hits should still be 1")
+}
