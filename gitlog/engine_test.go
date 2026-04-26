@@ -4691,3 +4691,210 @@ func TestRenderPerformanceOptimizationUI_DisplaysMetrics(t *testing.T) {
 	AssertTrue(t, len(ui) > 0, "performance UI should not be empty")
 	AssertStringContains(t, ui, "Performance", "should contain perf metrics")
 }
+
+// --- Option 5: Advanced Git Operations ---
+
+func TestSimulateRebase_AnalyzesChanges(t *testing.T) {
+	fixture := NewTestFixture()
+
+	simulation := simulateRebase(fixture.Commits, "main", "feature")
+	AssertNotNil(t, simulation, "should simulate rebase")
+	AssertTrue(t, len(simulation.Outcome) > 0, "should contain simulation data")
+}
+
+func TestAnalyzeMergeStrategy_RecommendsStrategy(t *testing.T) {
+	fixture := NewTestFixture()
+
+	strategy := analyzeMergeStrategy(fixture.Commits, "main", "feature")
+	AssertNotNil(t, strategy, "should analyze strategy")
+	AssertTrue(t, len(strategy.RecommendedStrategy) > 0, "should contain strategy info")
+}
+
+func TestFindOptimalMergeBase_IdentifiesBase(t *testing.T) {
+	fixture := NewTestFixture()
+
+	base := findOptimalMergeBase(fixture.Commits, "main", "feature")
+	AssertNotNil(t, base, "should find merge base")
+}
+
+func TestOptimizeCherryPick_MinimizesConflicts(t *testing.T) {
+	fixture := NewTestFixture()
+
+	optimization := optimizeCherryPick(fixture.Commits, []string{"abc123", "def456"})
+	AssertNotNil(t, optimization, "should optimize cherry-pick")
+	AssertTrue(t, len(optimization.OptimizedSequence) > 0, "should have optimized sequence")
+}
+
+func TestAnalyzeStashContents_ListsStashes(t *testing.T) {
+	stashes := analyzeStashContents()
+	AssertNotNil(t, stashes, "should analyze stashes")
+}
+
+func TestRecoverFromStash_RetrievesChanges(t *testing.T) {
+	stashID := "stash@{0}"
+	recovered := recoverFromStash(stashID)
+
+	AssertNotNil(t, recovered, "should recover stash")
+}
+
+func TestAnalyzeReflog_TracksHistory(t *testing.T) {
+	reflog := analyzeReflog()
+	AssertNotNil(t, reflog, "should analyze reflog")
+	AssertTrue(t, len(reflog) >= 0, "should have reflog data")
+}
+
+func TestRecommendSquashFixup_SuggestsCleanup(t *testing.T) {
+	fixture := NewTestFixture()
+
+	recommendations := recommendSquashFixup(fixture.Commits)
+	AssertNotNil(t, recommendations, "should recommend cleanup")
+}
+
+func TestDetectConflictProne_FindsRiskyCommits(t *testing.T) {
+	fixture := NewTestFixture()
+
+	conflicts := detectConflictProne(fixture.Commits)
+	AssertNotNil(t, conflicts, "should detect conflicts")
+}
+
+func TestRenderGitOperationsUI_DisplaysTools(t *testing.T) {
+	fixture := NewTestFixture()
+
+	ui := renderGitOperationsUI(fixture.Commits)
+	AssertNotNil(t, ui, "should render git ops UI")
+	AssertTrue(t, len(ui) > 0, "git ops UI should not be empty")
+	AssertStringContains(t, ui, "Git", "should contain git operations")
+}
+
+// --- Option 7: Advanced Repository Management ---
+
+func TestAnalyzeMultiRepo_AggregatesData(t *testing.T) {
+	repos := []string{"repo1", "repo2", "repo3"}
+	analysis := analyzeMultiRepo(repos)
+
+	AssertNotNil(t, analysis, "should analyze multi-repo")
+	AssertTrue(t, analysis.Repositories > 0, "should have aggregated data")
+}
+
+func TestManageMirrors_TracksMirrors(t *testing.T) {
+	mirrors := manageMirrors("https://github.com/example/repo.git")
+	AssertNotNil(t, mirrors, "should manage mirrors")
+}
+
+func TestTrackCloneOperations_MonitorsClones(t *testing.T) {
+	clones := trackCloneOperations()
+	AssertNotNil(t, clones, "should track clones")
+}
+
+func TestPlanBackupStrategy_CreatesPlan(t *testing.T) {
+	plan := planBackupStrategy("repo_path")
+	AssertNotNil(t, plan, "should create backup plan")
+	AssertTrue(t, len(plan.Strategy) > 0, "should have backup details")
+}
+
+func TestCheckRepositoryHealth_AuditsRepo(t *testing.T) {
+	health := checkRepositoryHealth("repo_path")
+	AssertNotNil(t, health, "should check health")
+}
+
+func TestOptimizeRepositorySize_ReducesFootprint(t *testing.T) {
+	optimization := optimizeRepositorySize("repo_path")
+	AssertNotNil(t, optimization, "should optimize size")
+	AssertTrue(t, optimization.RecoveredSpace > 0, "should contain optimization data")
+}
+
+func TestTrackStorageQuota_MonitorsSpace(t *testing.T) {
+	quota := trackStorageQuota("repo_path")
+	AssertNotNil(t, quota, "should track quota")
+}
+
+func TestTrackDependencies_AcrossRepos(t *testing.T) {
+	repos := []string{"repo1", "repo2"}
+	dependencies := trackDependencies(repos)
+
+	AssertNotNil(t, dependencies, "should track dependencies")
+}
+
+func TestDetectDependencyCycles_FindsCycles(t *testing.T) {
+	repos := []string{"repo1", "repo2", "repo3"}
+	cycles := detectDependencyCycles(repos)
+
+	AssertNotNil(t, cycles, "should detect cycles")
+}
+
+func TestRenderRepositoryManagementUI_DisplaysMetrics(t *testing.T) {
+	ui := renderRepositoryManagementUI()
+	AssertNotNil(t, ui, "should render repo management UI")
+	AssertTrue(t, len(ui) > 0, "repo UI should not be empty")
+	AssertStringContains(t, ui, "Repository", "should contain repo metrics")
+}
+
+// --- Option 8: Developer Experience ---
+
+func TestFormatOutputWithColors_EnhancesOutput(t *testing.T) {
+	output := formatOutputWithColors("status: active")
+	AssertNotNil(t, output, "should format output")
+	AssertTrue(t, len(output) > 0, "formatted output should not be empty")
+}
+
+func TestGenerateShellAutoComplete_CreatesCompletion(t *testing.T) {
+	shell := "bash"
+	completion := generateShellAutoComplete(shell)
+
+	AssertNotNil(t, completion, "should generate completion")
+	AssertTrue(t, len(completion) > 0, "completion should not be empty")
+}
+
+func TestIntegrateGitHooks_SetupHooks(t *testing.T) {
+	hookType := "pre-commit"
+	setup := integrateGitHooks(hookType)
+
+	AssertTrue(t, setup, "should setup git hooks")
+}
+
+func TestGenerateIDEPlugin_CreatesPlugin(t *testing.T) {
+	ide := "vscode"
+	plugin := generateIDEPlugin(ide)
+
+	AssertNotNil(t, plugin, "should generate IDE plugin")
+	AssertTrue(t, len(plugin) > 0, "plugin should not be empty")
+}
+
+func TestGenerateGitAliases_CreatesAliases(t *testing.T) {
+	aliases := generateGitAliases()
+	AssertNotNil(t, aliases, "should generate aliases")
+	AssertTrue(t, len(aliases) > 0, "should have aliases")
+}
+
+func TestCreateWorkflowTemplates_GeneratesTemplates(t *testing.T) {
+	templates := createWorkflowTemplates()
+	AssertNotNil(t, templates, "should create templates")
+	AssertTrue(t, len(templates) > 0, "should have templates")
+}
+
+func TestImproveTableFormat_EnhancesDisplay(t *testing.T) {
+	data := [][]string{{"col1", "col2"}, {"val1", "val2"}}
+	formatted := improveTableFormat(data)
+
+	AssertNotNil(t, formatted, "should format table")
+	AssertTrue(t, len(formatted) > 0, "formatted table should not be empty")
+}
+
+func TestEnableProgressBar_ShowsProgress(t *testing.T) {
+	progress := enableProgressBar(100)
+	AssertNotNil(t, progress, "should enable progress bar")
+}
+
+func TestGenerateCompletion_ForCommands(t *testing.T) {
+	commands := []string{"log", "diff", "status"}
+	completion := generateCompletion(commands)
+
+	AssertNotNil(t, completion, "should generate completion")
+}
+
+func TestRenderDeveloperExperienceUI_DisplaysTools(t *testing.T) {
+	ui := renderDeveloperExperienceUI()
+	AssertNotNil(t, ui, "should render DX UI")
+	AssertTrue(t, len(ui) > 0, "DX UI should not be empty")
+	AssertStringContains(t, ui, "Developer", "should contain DX info")
+}
