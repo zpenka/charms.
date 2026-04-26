@@ -1017,9 +1017,9 @@ func diffPanelHeight(m model) int {
 	return h
 }
 
-// parseFileItems scans diffLines for "diff --git" boundaries and returns each
+// parseFileItemsFromDiff scans diffLines for "diff --git" boundaries and returns each
 // file's path and the index of its boundary line in diffLines.
-func parseFileItems(lines []diffLine) []fileItem {
+func parseFileItemsFromDiff(lines []diffLine) []fileItem {
 	var items []fileItem
 	for i, line := range lines {
 		if line.kind != lineMeta || !strings.HasPrefix(line.text, "diff --git ") {
