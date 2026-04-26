@@ -2335,18 +2335,24 @@ func renderCommitRowWithStats(m model, idx int, width int) string {
 }
 
 // renderBookmarkList renders list of bookmarked commits.
+// renderBookmarkList renders bookmarked commits using consolidated rendering.
 func renderBookmarkList(m model, width int) string {
-	var sb strings.Builder
-	sb.WriteString("Bookmarks:\n")
-	for i, hash := range m.bookmarks {
+	var items []string
+	for _, hash := range m.bookmarks {
 		for _, c := range m.commits {
 			if c.shortHash == hash {
-				sb.WriteString(fmt.Sprintf("%d: %s - %s\n", i, hash, c.subject))
+				items = append(items, fmt.Sprintf("%s - %s", hash, c.subject))
 				break
 			}
 		}
 	}
-	return sb.String()
+
+	config := RenderConfig{
+		Title:       "Bookmarks",
+		Items:       items,
+		ShowIndices: true,
+	}
+	return RenderStandardUI(config)
 }
 
 // renderGraphView renders the commit graph.
@@ -2685,13 +2691,9 @@ func calculateAuthorStats(commits []commit) map[string]int {
 }
 
 // renderAuthorStats renders author statistics as a list.
+// renderAuthorStats renders author statistics using consolidated rendering.
 func renderAuthorStats(stats map[string]int, width int) string {
-	var sb strings.Builder
-	sb.WriteString("Author Statistics:\n")
-	for author, count := range stats {
-		sb.WriteString(fmt.Sprintf("%s: %d commits\n", author, count))
-	}
-	return sb.String()
+	return RenderSummaryStats("Author Statistics", stats)
 }
 
 // --- Time-based Analytics ---
@@ -2724,14 +2726,9 @@ func aggregateByWeek(commits []commit) map[string]int {
 	return weekly
 }
 
-// renderTimeStats renders time-based statistics as heatmap-style output.
+// renderTimeStats renders time-based statistics using consolidated rendering.
 func renderTimeStats(stats map[string]int, width int) string {
-	var sb strings.Builder
-	sb.WriteString("Time-based Statistics:\n")
-	for period, count := range stats {
-		sb.WriteString(fmt.Sprintf("%s: %d\n", period, count))
-	}
-	return sb.String()
+	return RenderSummaryStats("Time-based Statistics", stats)
 }
 
 // --- Co-author Detection ---
@@ -2777,14 +2774,9 @@ func calculateProductivity(commits []commit) map[string]interface{} {
 	return metrics
 }
 
-// renderProductivityMetrics renders productivity metrics.
+// renderProductivityMetrics renders productivity metrics using consolidated rendering.
 func renderProductivityMetrics(metrics map[string]interface{}, width int) string {
-	var sb strings.Builder
-	sb.WriteString("Productivity Metrics:\n")
-	for key, value := range metrics {
-		sb.WriteString(fmt.Sprintf("%s: %v\n", key, value))
-	}
-	return sb.String()
+	return RenderAnalysisUI("Productivity Metrics", metrics)
 }
 
 // --- UI Integration ---
