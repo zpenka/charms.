@@ -8,6 +8,27 @@ import (
 // Consolidated rendering functions to reduce duplication
 // All render*UI functions follow this pattern for consistency
 
+// Helper functions for building render data
+
+// BuildAnalysisData creates a map from key-value pairs for RenderAnalysisUI.
+// This reduces boilerplate in render functions.
+func BuildAnalysisData(pairs ...interface{}) map[string]interface{} {
+	data := make(map[string]interface{})
+	for i := 0; i < len(pairs)-1; i += 2 {
+		key := pairs[i].(string)
+		data[key] = pairs[i+1]
+	}
+	return data
+}
+
+// BuildItemsList creates a list of strings for RenderStandardUI.
+// This is a convenience function to ensure consistent formatting.
+func BuildItemsList(items []string) RenderConfig {
+	return RenderConfig{
+		Items: items,
+	}
+}
+
 // RenderConfig holds common rendering parameters
 type RenderConfig struct {
 	Title       string
